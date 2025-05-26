@@ -3,23 +3,28 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import LoadingSpinner from './common/LoadingSpinner';
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    const token = localStorage.getItem('authToken');
+    if (!loading && !token) {
       router.replace('/');
     }
-  }, [isAuthenticated, loading, router]);
+  }, [loading, router]);
 
   if (loading) {
-    return <LoadingSpinner/>; // or your preferred loading spinner
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
-  if (!isAuthenticated) {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
     return null;
   }
 

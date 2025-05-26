@@ -2,13 +2,15 @@
 
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import api from '@/api';
 
 const AuthContext = createContext({
   isAuthenticated: false,
   user: null,
   loading: true,
   login: () => {},
-  logout: () => {}
+  logout: () => {},
+  refreshUserData: () => {}
 });
 
 export const AuthProvider = ({ children }) => {
@@ -17,28 +19,57 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Function to validate token and refresh if needed
+  const validateToken = async (token) => {
+    try {
+      const response = await api.refreshToken();
+      if (!response) {
+        return { isValid: true }; // Keep session active if refresh fails
+      }
+      
+      const { newToken, user: userData } = response;
+      
+      if (newToken) {
+        localStorage.setItem('authToken', newToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return { isValid: true, user: userData };
+      }
+      
+      return { isValid: true }; // Keep session if no new token
+    } catch (error) {
+      console.error('Token validation error:', error);
+      return { isValid: true }; // Keep session on error
+    }
+  };
+
+  // Function to refresh user data
+  const refreshUserData = async () => {
+    try {
+      const response = await api.getCurrentAdmin();
+      const userData = response;
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // Check for existing auth token on initial load
-        const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+        const token = localStorage.getItem('authToken');
+        const storedUser = localStorage.getItem('user');
         
         if (token && storedUser) {
-          // Optional: Add token validation logic here
-          // For example, you might want to call an API to verify the token
-          // const isValidToken = await validateToken(token);
-          
-          // if (isValidToken) {
-            setIsAuthenticated(true);
-            setUser(JSON.parse(storedUser));
-          // } else {
-          //   throw new Error('Invalid token');
-          // }
+          setIsAuthenticated(true);
+          setUser(JSON.parse(storedUser));
+          // Refresh user data in background
+          refreshUserData();
         }
       } catch (error) {
-        // If token validation fails, logout the user
-        logout();
+        console.error('Auth status check error:', error);
       } finally {
         setLoading(false);
       }
@@ -47,24 +78,64 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
-  const login = (token, userData) => {
-    if (typeof window !== 'undefined') {
+  // Set up token refresh interval
+  useEffect(() => {
+    let refreshInterval;
+
+    if (isAuthenticated) {
+      // Refresh token every 14 minutes (assuming 15-minute token expiry)
+      refreshInterval = setInterval(async () => {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          await logout();
+          return;
+        }
+
+        const { isValid, user: refreshedUser } = await validateToken(token);
+        if (!isValid) {
+          await logout();
+        } else if (refreshedUser) {
+          setUser(refreshedUser);
+        }
+      }, 14 * 60 * 1000);
+    }
+
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [isAuthenticated]);
+
+  const login = async (token, userData) => {
+    try {
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
+      setIsAuthenticated(true);
+      setUser(userData);
+      
+      // Initialize API with new token
+      api.getToken();
+      
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-    setIsAuthenticated(true);
-    setUser(userData);
-    router.push('/dashboard');
   };
 
-  const logout = () => {
-    if (typeof window !== 'undefined') {
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
+      setIsAuthenticated(false);
+      setUser(null);
+      router.push('/');
     }
-    setIsAuthenticated(false);
-    setUser(null);
-    router.push('/');
   };
 
   return (
@@ -73,11 +144,18 @@ export const AuthProvider = ({ children }) => {
       user, 
       loading, 
       login, 
-      logout 
+      logout,
+      refreshUserData
     }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

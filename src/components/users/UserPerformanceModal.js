@@ -58,7 +58,6 @@ const UserPerformanceModal = ({ isOpen, onClose, userId }) => {
           year: filters.year
         }
       });
-      console.log("response",response.data)
       if (response.data.success) {
         setPerformances(response.data.data);
         setStats(response.data.stats);
