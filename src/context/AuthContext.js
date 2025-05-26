@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }) => {
   const refreshUserData = async () => {
     try {
       const response = await api.getCurrentUser();
-      const userData = response;
+      const userData = response.data;
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       return userData;
@@ -107,15 +107,15 @@ export const AuthProvider = ({ children }) => {
     };
   }, [isAuthenticated]);
 
-  const login = async (token, userData) => {
+  const login = async (credentials) => {
     try {
+      const response = await api.login(credentials);
+      const { token, user: userData } = response.data;
+      
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
       setIsAuthenticated(true);
       setUser(userData);
-      
-      // Initialize API with new token
-      api.getToken();
       
       // Redirect based on user role
       if (['superadmin', 'admin'].includes(userData.role)) {

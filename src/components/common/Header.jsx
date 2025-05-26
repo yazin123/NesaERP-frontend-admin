@@ -48,8 +48,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
     const handleLogout = async () => {
         try {
-            await api.logout();
-            logout();
+            await logout();
         } catch (error) {
             console.error('Logout error:', error);
             // Still logout the user locally even if the API call fails
@@ -61,7 +60,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     React.useEffect(() => {
         const fetchNotifications = async () => {
             try {
-                const response = await api.getNotifications();
+                const response = await api.getMyNotifications();
                 setNotifications(response.data.filter(n => !n.read));
             } catch (error) {
                 console.error('Failed to fetch notifications:', error);

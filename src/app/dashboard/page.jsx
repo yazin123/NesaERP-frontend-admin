@@ -17,11 +17,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/api';
+import { useAuth } from '@/context/AuthContext';
 
 function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
     const [error, setError] = useState('');
+    const { user } = useAuth();
 
     useEffect(() => {
         fetchDashboardStats();
@@ -29,8 +31,10 @@ function DashboardPage() {
 
     const fetchDashboardStats = async () => {
         try {
-            const response = await api.getDashboardStats();
-            setStats(response.data.data);
+            const response = user?.role === 'admin' || user?.role === 'superadmin'
+                ? await api.admin.getDashboardStats()
+                : await api.getMyDashboardStats();
+            setStats(response.data);
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
             setError('Failed to load dashboard statistics');

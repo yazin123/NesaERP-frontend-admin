@@ -1,362 +1,257 @@
 //src/api/index.js
 import axios from "axios";
+import { setupCache } from 'axios-cache-interceptor';
 
-class ApiHelper {
-  constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-    this.headers = {
-      'Content-Type': 'application/json',
-    };
-  }
+const api = setupCache(
+  axios.create({
+    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+    timeout: 10000,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    // Retry configuration
+    retry: {
+      retries: 3,
+      retryCondition: (error) => {
+        return axios.isRetryableError(error) && error.response?.status !== 401;
+      },
+      retryDelay: (retryCount) => retryCount * 1000, // Progressive delay
+    }
+  })
+);
 
-  getToken() {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("authToken");
+// Request queue for offline support
+let requestQueue = [];
+const isOnline = () => typeof window !== 'undefined' && window.navigator.onLine;
+
+// Request interceptor
+api.interceptors.request.use(
+  async (config) => {
+    const token = localStorage.getItem('authToken');
       if (token) {
-        this.headers["Authorization"] = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Queue requests if offline
+    if (!isOnline() && config.method !== 'get') {
+      requestQueue.push(config);
+      throw new Error('Offline - Request queued');
+    }
+
+    // Log request
+    console.debug(`API Request: ${config.method?.toUpperCase()} ${config.url}`, 
+      config.method !== 'get' ? config.data : '');
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => {
+    // Log response
+    console.debug(`API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, 
+      response.data);
+    return response;
+  },
+  async (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('authToken');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Process queued requests when back online
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', async () => {
+    const queue = [...requestQueue];
+    requestQueue = [];
+    for (const config of queue) {
+      try {
+        await api(config);
+    } catch (error) {
+        console.error('Failed to process queued request:', error);
       }
     }
-  }
-
-  async request(endpoint, options = {}) {
-    this.getToken();
-    
-    const url = `${this.baseURL}${endpoint}`;
-    const config = {
-      ...options,
-      headers: this.headers,
-    };
-
-    try {
-      const response = await fetch(url, config);
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          // Try token refresh on 401
-          try {
-            const refreshResult = await this.refreshToken();
-            if (refreshResult?.newToken) {
-              localStorage.setItem('authToken', refreshResult.newToken);
-              this.headers["Authorization"] = `Bearer ${refreshResult.newToken}`;
-              // Retry the original request
-              const retryResponse = await fetch(url, {
-                ...config,
-                headers: this.headers,
-              });
-              const retryData = await retryResponse.json();
-              if (retryResponse.ok) {
-                return { data: retryData };
-              }
-            }
-          } catch (refreshError) {
-            console.error('Token refresh failed:', refreshError);
-          }
-          // If refresh failed or retry failed, logout
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("authToken");
-            localStorage.removeItem("user");
-            window.location.href = '/';
-          }
-        }
-        throw {
-          status: response.status,
-          message: data.message || 'An error occurred',
-          response: { data }
-        };
-      }
-
-      return { data };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async get(endpoint) {
-    return this.request(endpoint, {
-      method: 'GET',
-    });
-  }
-
-  async post(endpoint, data) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async put(endpoint, data) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async delete(endpoint) {
-    return this.request(endpoint, {
-      method: 'DELETE',
-    });
-  }
-
-  // Admin User Management
-  async getCurrentAdmin() {
-    try {
-      const response = await this.get('/admin/users/me');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async updateAdminProfile(data) {
-    try {
-      const response = await this.put('/admin/users/profile', data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async changeAdminPassword(data) {
-    try {
-      const response = await this.put('/admin/users/change-password', data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  // Admin Employee Management
-  async getEmployees(filters = {}) {
-    try {
-      const response = await this.get('/admin/employees', { params: filters });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async getEmployee(id) {
-    try {
-      const response = await this.get(`/admin/employees/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async createEmployee(data) {
-    try {
-      const response = await this.post('/admin/employees', data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async updateEmployee(id, data) {
-    try {
-      const response = await this.put(`/admin/employees/${id}`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async deleteEmployee(id) {
-    try {
-      const response = await this.delete(`/admin/employees/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  // Admin Project Management
-  async getProjects(filters = {}) {
-    try {
-      const response = await this.get('/admin/projects', { params: filters });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async getProject(id) {
-    try {
-      const response = await this.get(`/admin/projects/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async createProject(data) {
-    try {
-      const response = await this.post('/admin/projects', data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async updateProject(id, data) {
-    try {
-      const response = await this.put(`/admin/projects/${id}`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async deleteProject(id) {
-    try {
-      const response = await this.delete(`/admin/projects/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  // Admin Task Management
-  async getTasks(filters = {}) {
-    try {
-      const response = await this.get('/admin/tasks', { params: filters });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async getTask(id) {
-    try {
-      const response = await this.get(`/admin/tasks/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async createTask(data) {
-    try {
-      const response = await this.post('/admin/tasks', data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async updateTask(id, data) {
-    try {
-      const response = await this.put(`/admin/tasks/${id}`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async deleteTask(id) {
-    try {
-      const response = await this.delete(`/admin/tasks/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  // Admin Dashboard
-  async getDashboardStats() {
-    try {
-      const response = await this.get('/admin/dashboard/stats');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async getProjectProgress() {
-    try {
-      const response = await this.get('/admin/dashboard/projects/progress');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async getTeamWorkload() {
-    try {
-      const response = await this.get('/admin/dashboard/team/workload');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async getRecentActivities() {
-    try {
-      const response = await this.get('/admin/dashboard/activities');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  // Admin Settings
-  async getSystemSettings() {
-    try {
-      const response = await this.get('/admin/settings');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async updateSystemSettings(data) {
-    try {
-      const response = await this.put('/admin/settings', data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  // Authentication endpoints
-  async login(credentials) {
-    try {
-      const response = await this.post('/admin/users/login', credentials);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
-  }
-
-  async logout() {
-    try {
-      await this.post('/admin/users/logout');
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("user");
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("user");
-      }
-      throw error;
-    }
-  }
-
-  async refreshToken() {
-    try {
-      const response = await this.post('/admin/users/refresh-token');
-      return response.data;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      return null;
-    }
-  }
+  });
 }
 
-const api = new ApiHelper();
-export default api;
+// Common endpoints (available to all authenticated users)
+const common = {
+  // Auth
+  login: (credentials) => api.post('/users/login', credentials),
+  logout: () => api.post('/users/logout'),
+  getCurrentUser: () => api.get('/users/current'),
+  changePassword: (userId, data) => api.put(`/users/${userId}/change-password`, data),
+  updateProfile: (data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'photo') {
+        if (data[key]) formData.append(key, data[key]);
+      } else {
+        formData.append(key, data[key]);
+      }
+    });
+    return api.put('/users/profile', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Dashboard
+  getMyDashboardStats: () => api.get('/dashboard'),
+
+  // Personal notifications
+  getMyNotifications: () => api.get('/notifications'),
+  markNotificationAsRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllNotificationsAsRead: () => api.put('/notifications/read-all'),
+  deleteNotification: (id) => api.delete(`/notifications/${id}`),
+  getNotificationPreferences: () => api.get('/notifications/preferences'),
+  updateNotificationPreferences: (preferences) => api.put('/notifications/preferences', preferences),
+
+  // Personal tasks
+  getMyTasks: (params) => api.get('/tasks/my-tasks', { params }),
+  getTaskById: (id) => api.get(`/tasks/${id}`),
+  updateTaskStatus: (id, status) => api.patch(`/tasks/${id}/status`, { status }),
+  addTaskComment: (id, comment) => api.post(`/tasks/${id}/comments`, { comment }),
+
+  // Personal projects
+  getMyProjects: (params) => api.get('/projects/my-projects', { params }),
+  getProjectById: (id) => api.get(`/projects/${id}`),
+  subscribeToProject: (projectId) => api.post(`/notifications/subscribe/project/${projectId}`),
+  unsubscribeFromProject: (projectId) => api.delete(`/notifications/subscribe/project/${projectId}`),
+
+  // Basic system status
+  getBasicSystemStatus: () => api.get('/system/status')
+};
+
+// Admin-only endpoints
+const admin = {
+  // User management
+  getAllUsers: (params) => api.get('/admin/users', { params }),
+  getManagers: () => api.get('/admin/users/managers'),
+  getUserById: (id) => api.get(`/admin/users/${id}`),
+  createUser: (data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'photo' || key === 'resume') {
+        if (data[key]) formData.append(key, data[key]);
+      } else if (typeof data[key] === 'object') {
+        formData.append(key, JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key]);
+      }
+    });
+    return api.post('/admin/users', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  updateUser: (id, data) => {
+    const formData = new FormData();
+    
+    // If data is already FormData, use it directly
+    if (data instanceof FormData) {
+      return api.put(`/admin/users/update/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    }
+
+    // Convert data to FormData
+    Object.keys(data).forEach(key => {
+      if (key === 'photo' || key === 'resume') {
+        if (data[key]) formData.append(key, data[key]);
+      } else if (typeof data[key] === 'object') {
+        formData.append(key, JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key]);
+      }
+    });
+
+    return api.put(`/admin/users/update/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+
+  // Alias employee endpoints to user endpoints for backward compatibility
+  getEmployees: (params) => api.get('/admin/users', { params: { ...params } }),
+  getEmployeeById: (id) => api.get(`/admin/users/${id}`),
+  createEmployee: (data) => admin.createUser({ ...data, type: 'employee' }),
+  updateEmployee: (id, data) => admin.updateUser(id, { ...data, type: 'employee' }),
+  deleteEmployee: (id) => admin.deleteUser(id),
+
+  // Project management
+  getAllProjects: (params) => api.get('/admin/projects', { params }),
+  getFilteredProjects: (params) => api.get('/admin/projects/filter', { params }),
+  getProjectById: (id) => api.get(`/admin/projects/${id}`),
+  createProject: (data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'files') {
+        if (data[key]) {
+          data[key].forEach(file => formData.append('files', file));
+        }
+      } else if (typeof data[key] === 'object') {
+        formData.append(key, JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key]);
+      }
+    });
+    return api.post('/admin/projects', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  updateProject: (id, data) => {
+      const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'files') {
+        if (data[key]) {
+          data[key].forEach(file => formData.append('files', file));
+        }
+      } else if (typeof data[key] === 'object') {
+        formData.append(key, JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key]);
+      }
+    });
+    return api.put(`/admin/projects/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteProject: (id) => api.delete(`/admin/projects/${id}`),
+  updateProjectStatus: (id, status) => api.patch(`/admin/projects/${id}/status`, { status }),
+  updateProjectPipeline: (id, data) => api.patch(`/admin/projects/${id}/pipeline`, data),
+  getTeamMembersByTechStack: (params) => api.get('/admin/projects/team-members/tech-stack', { params }),
+
+  // Task management
+  getAllTasks: (params) => api.get('/admin/tasks', { params }),
+  createTask: (data) => api.post('/admin/tasks', data),
+  updateTask: (id, data) => api.put(`/admin/tasks/${id}`, data),
+  deleteTask: (id) => api.delete(`/admin/tasks/${id}`),
+
+  // Performance management
+  getUserPerformance: (userId) => api.get(`/admin/performance/${userId}`),
+  updatePerformance: (userId, data) => api.put(`/admin/performance/${userId}`, data),
+
+  // Dashboard
+  getDashboardStats: () => api.get('/admin/dashboard'),
+
+  // System monitoring
+  getSystemMetrics: () => api.get('/admin/monitoring/detailed-metrics'),
+  getEmailQueueStatus: () => api.get('/admin/monitoring/email-queue'),
+  getSystemHealth: () => api.get('/admin/monitoring/health'),
+  clearFailedEmails: () => api.post('/admin/monitoring/email-queue/clear-failed')
+};
+
+// Create the final API object with proper type checking
+const apiObject = {
+  ...common,
+  admin
+};
+
+// Export the API object
+export default apiObject;

@@ -96,9 +96,10 @@ const EmployeeDetails = ({ employeeId }) => {
     const fetchEmployeeDetails = async () => {
         try {
             setLoading(true);
-            const response = await api.getEmployee(employeeId);
-            setEmployee(response);
-            setEditedData(response); // Initialize edited data with current data
+            const response = await api.admin.getEmployeeById(employeeId);
+            console.log("response", response);
+            setEmployee(response.data);
+            setEditedData(response.data); // Initialize edited data with current data
             setError(null);
         } catch (error) {
             console.error('Error fetching employee details:', error);
@@ -130,24 +131,43 @@ const EmployeeDetails = ({ employeeId }) => {
             setLoading(true);
             const formData = new FormData();
 
-            // Append all fields from editedData
+            // Only send fields that have changed
             Object.keys(editedData).forEach(key => {
-                if (key !== 'photo' && key !== 'resume') {
-                    if (typeof editedData[key] === 'object') {
-                        formData.append(key, JSON.stringify(editedData[key]));
-                    } else {
-                        formData.append(key, editedData[key]);
-                    }
+                // Skip internal fields and files
+                if (['_id', '__v', 'photo', 'resume'].includes(key)) {
+                    return;
+                }
+
+                // Skip if value hasn't changed
+                if (JSON.stringify(employee[key]) === JSON.stringify(editedData[key])) {
+                    return;
+                }
+
+                // Handle different types of data
+                if (typeof editedData[key] === 'object' && editedData[key] !== null) {
+                    formData.append(key, JSON.stringify(editedData[key]));
+                } else if (editedData[key] !== null && editedData[key] !== undefined) {
+                    formData.append(key, editedData[key].toString());
                 }
             });
 
-            await api.updateEmployee(employeeId, formData);
-            await fetchEmployeeDetails();
-            setIsEditing(false);
-            toast.success('Employee details updated successfully');
+            // Add type field to ensure proper handling
+            formData.append('type', 'employee');
+
+            const response = await api.admin.updateUser(employeeId, formData);
+            
+            if (response?.data) {
+                // Update the local employee state with the response data
+                setEmployee(response.data);
+                // Reset edited data to match the new employee data
+                setEditedData(response.data);
+                setIsEditing(false);
+                toast.success('Employee details updated successfully');
+            } else {
+                throw new Error('Failed to update employee details');
+            }
         } catch (error) {
-            console.error('Error updating employee:', error);
-            toast.error('Failed to update employee details');
+            toast.error(error.response?.data?.message || 'Failed to update employee details');
         } finally {
             setLoading(false);
         }
@@ -195,7 +215,7 @@ const EmployeeDetails = ({ employeeId }) => {
                 <div className="flex items-center gap-6">
                     <Avatar className="h-24 w-24">
                         <AvatarImage src={data.photo} alt={data.name} />
-                        <AvatarFallback>{data.name.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>{data?.name.charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div>
                         {isEditing ? (

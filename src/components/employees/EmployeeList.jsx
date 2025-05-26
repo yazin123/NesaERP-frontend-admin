@@ -62,11 +62,12 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import api from '@/api';
+import { useToast } from '@/hooks/use-toast';
 
 const EmployeeList = () => {
     const router = useRouter();
     const { user } = useAuth();
-    
+    const toast = useToast();
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [totalCount, setTotalCount] = useState(0);
@@ -123,11 +124,19 @@ const EmployeeList = () => {
     const fetchEmployees = async () => {
         try {
             setLoading(true);
-            const response = await api.getEmployees(filters);
-            setEmployees(response.users || []);
-            setTotalCount(response.total || 0);
+            const response = await api.admin.getEmployees(filters);
+            if (response) {
+                console.log("response", response.data);
+                setEmployees(response.data.users || []);
+                setTotalCount(response?.data.total || 0);
+            }
         } catch (error) {
             console.error('Error fetching employees:', error);
+            toast({
+                title: "Error",
+                description: "Failed to fetch employees. Please try again.",
+                variant: "destructive"
+            });
         } finally {
             setLoading(false);
         }
@@ -140,10 +149,20 @@ const EmployeeList = () => {
     const handleDeleteEmployee = async (id) => {
         if (window.confirm('Are you sure you want to delete this employee?')) {
             try {
-                await api.deleteEmployee(id);
-                fetchEmployees();
+                await api.admin.deleteEmployee(id);
+                await fetchEmployees();
+                toast({
+                    title: "Success",
+                    description: "Employee deleted successfully",
+                    variant: "default"
+                });
             } catch (error) {
                 console.error('Error deleting employee:', error);
+                toast({
+                    title: "Error",
+                    description: "Failed to delete employee. Please try again.",
+                    variant: "destructive"
+                });
             }
         }
     };
@@ -308,7 +327,7 @@ const EmployeeList = () => {
                                         <div className="flex items-center gap-3">
                                             <Avatar>
                                                 <AvatarImage src={employee.photo} alt={employee.name} />
-                                                <AvatarFallback>{employee.name.charAt(0).toUpperCase()}</AvatarFallback>
+                                                <AvatarFallback>{employee.name?.charAt(0).toUpperCase()}</AvatarFallback>
                                             </Avatar>
                                             <div>
                                                 <div className="font-medium">{employee.name}</div>
@@ -341,7 +360,7 @@ const EmployeeList = () => {
                                         <Badge variant="secondary">{employee.position}</Badge>
                                     </TableCell>
                                     <TableCell>
-                                        {employee.dateOfJoining ? format(new Date(employee.dateOfJoining), 'PP') : 'N/A'}
+                                        {employee.joiningDate ? format(new Date(employee.joiningDate), 'PP') : 'N/A'}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
@@ -390,7 +409,7 @@ const EmployeeList = () => {
                             <CardHeader className="flex flex-row items-center gap-4">
                                 <Avatar className="h-14 w-14">
                                     <AvatarImage src={employee.photo} alt={employee.name} />
-                                    <AvatarFallback>{employee.name.charAt(0).toUpperCase()}</AvatarFallback>
+                                    <AvatarFallback>{employee.name?.charAt(0).toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <div>
                                     <CardTitle>{employee.name}</CardTitle>

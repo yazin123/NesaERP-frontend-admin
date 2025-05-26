@@ -19,39 +19,38 @@ export function ProjectList() {
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { toast } = useToast();
+  const toast = useToast();
 
   useEffect(() => {
     fetchProjects();
-    subscribeToProjectUpdates();
   }, []);
 
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
-      const data = await api.getAllProjects();
-      setProjects(data);
-      setError(null);
+      const response = await api.admin.getAllProjects();
+      if (response?.data?.success) {
+        setProjects(response.data.data || []);
+        // Subscribe to notifications for all projects
+        response.data.data?.forEach(async (project) => {
+          try {
+            await api.common.subscribeToProject(project._id);
+          } catch (err) {
+            console.error(`Failed to subscribe to project ${project._id}:`, err);
+          }
+        });
+      } else {
+        throw new Error(response?.data?.message || 'Failed to fetch projects');
+      }
     } catch (err) {
-      setError('Failed to fetch projects');
+      console.error('Error fetching projects:', err);
       toast({
         title: 'Error',
-        description: 'Failed to fetch projects. Please try again.',
+        description: err.message || 'Failed to fetch projects. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const subscribeToProjectUpdates = async () => {
-    try {
-      // Subscribe to notifications for all projects
-      projects.forEach(async (project) => {
-        await api.subscribeToProject(project.id);
-      });
-    } catch (err) {
-      console.error('Failed to subscribe to project updates:', err);
     }
   };
 
@@ -103,14 +102,14 @@ export function ProjectList() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {projects.map((project) => (
-        <Card key={project.id} className="hover:shadow-lg transition-shadow">
+        <Card key={project._id} className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex justify-between items-start">
               <div>
                 <CardTitle className="text-xl">{project.name}</CardTitle>
                 <CardDescription className="mt-2">{project.description}</CardDescription>
               </div>
-              <Badge variant="outline">{project.pipeline.currentPhase}</Badge>
+              <Badge variant="outline">{project.status}</Badge>
             </div>
           </CardHeader>
           <CardContent>
@@ -118,112 +117,114 @@ export function ProjectList() {
               {/* Project Head */}
               <div className="flex items-center gap-4">
                 <Avatar>
-                  <AvatarImage src={project.projectHead.avatar} />
-                  <AvatarFallback>{project.projectHead.name[0]}</AvatarFallback>
+                  <AvatarImage src={project.projectHead?.photo} />
+                  <AvatarFallback>{project.projectHead?.name?.[0] || 'PH'}</AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="text-sm font-medium">Project Head</p>
-                  <p className="text-sm text-muted-foreground">{project.projectHead.name}</p>
+                  <p className="text-sm text-muted-foreground">{project.projectHead?.name}</p>
                 </div>
               </div>
 
               {/* Point of Contact */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  Point of Contact
-                </p>
-                <div className="grid gap-2">
-                  {project.contacts.map((contact, index) => (
-                    <div key={index} className="text-sm flex items-center justify-between">
-                      <span>{contact.name}</span>
-                      <span className="text-muted-foreground">{contact.phone}</span>
-                    </div>
-                  ))}
+              {project.pointOfContact?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    Point of Contact
+                  </p>
+                  <div className="grid gap-2">
+                    {project.pointOfContact.map((contact, index) => (
+                      <div key={index} className="text-sm flex items-center justify-between">
+                        <span>{contact.name}</span>
+                        <span className="text-muted-foreground">{contact.phone}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Project Info */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{project.members} Members</span>
+                  <span className="text-sm">{project.members?.length || 0} Members</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">
-                    {new Date(project.dates[0].date).toLocaleDateString()} - 
-                    {new Date(project.dates[project.dates.length - 1].date).toLocaleDateString()}
+                    {new Date(project.startDate).toLocaleDateString()} - 
+                    {new Date(project.expectedEndDate).toLocaleDateString()}
                   </span>
                 </div>
               </div>
 
               {/* Progress */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Progress</span>
-                  <span className="text-sm text-muted-foreground">{project.progress}%</span>
+              {project.progress !== undefined && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Progress</span>
+                    <span className="text-sm text-muted-foreground">{project.progress}%</span>
+                  </div>
+                  <Progress value={project.progress} className="h-2" />
                 </div>
-                <Progress value={project.progress} className="h-2" />
-              </div>
+              )}
 
               {/* Tech Stack */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Layers className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Tech Stack</span>
+              {project.techStack?.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Layers className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Tech Stack</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {project.techStack.map((tech) => (
+                      <Badge key={tech} variant="secondary">{tech}</Badge>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {project.techStack.map((tech) => (
-                    <Badge key={tech} variant="secondary">{tech}</Badge>
-                  ))}
-                </div>
-              </div>
+              )}
 
               {/* Pipeline and History */}
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="pipeline">
-                  <AccordionTrigger className="text-sm font-medium">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Pipeline Progress
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-2 pt-2">
-                      {project.pipeline.phases.map((phase, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Badge className={getStatusColor(phase.status)}>
-                            {phase.status}
-                          </Badge>
-                          <span className="text-sm">{phase.name}</span>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem value="history">
-                  <AccordionTrigger className="text-sm font-medium">
-                    Recent History
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-3 pt-2">
-                      {project.history.map((item, index) => (
-                        <div key={index} className="text-sm space-y-1">
-                          <div className="flex justify-between">
-                            <span className="font-medium">{item.status}</span>
-                            <span className="text-muted-foreground">
-                              {new Date(item.datetime).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-muted-foreground">{item.description}</p>
-                          <p className="text-xs">Updated by {item.updatedby}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+              {project.pipeline && (
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="pipeline">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Pipeline Progress
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-2 pt-2">
+                        {Object.entries(project.pipeline).map(([phase, data], index) => {
+                          if (phase === 'developmentPhases') {
+                            return data.map((devPhase, devIndex) => (
+                              <div key={`dev-${devIndex}`} className="flex items-center gap-2">
+                                <Badge className={getStatusColor(devPhase.status)}>
+                                  {devPhase.status}
+                                </Badge>
+                                <span className="text-sm">{devPhase.phaseName}</span>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            ));
+                          }
+                          if (typeof data === 'object' && data.status) {
+                            return (
+                              <div key={phase} className="flex items-center gap-2">
+                                <Badge className={getStatusColor(data.status)}>
+                                  {data.status}
+                                </Badge>
+                                <span className="text-sm">{phase.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              )}
             </div>
           </CardContent>
         </Card>

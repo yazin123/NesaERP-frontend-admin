@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/api';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -37,10 +36,7 @@ export default function LoginPage() {
             setLoading(true);
             setError('');
             
-            const response = await api.login(data);
-            const { token, user } = response;
-            
-            await login(token, user);
+            await login(data);
             
             toast({
                 title: 'Success',
@@ -48,7 +44,7 @@ export default function LoginPage() {
             });
         } catch (error) {
             console.error('Login error:', error);
-            setError(error?.message || 'Invalid credentials');
+            setError(error?.response?.data?.message || 'Invalid credentials');
         } finally {
             setLoading(false);
         }
