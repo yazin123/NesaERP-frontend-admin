@@ -102,14 +102,14 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                 <div className="flex items-center gap-4">
                     <div className={`transition-all duration-200 ${showSearch ? 'w-64' : 'w-0'}`}>
                         {showSearch && (
-                            <Input
-                                placeholder="Search..."
+                        <Input
+                            placeholder="Search..."
                                 className="h-9"
                                 autoFocus
                                 onBlur={() => setShowSearch(false)}
-                            />
+                        />
                         )}
-                    </div>
+                </div>
                     <Button 
                         variant="ghost" 
                         size="icon"

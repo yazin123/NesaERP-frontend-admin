@@ -42,14 +42,16 @@ const EmployeeForm = ({ employee = null }) => {
 
     const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
         defaultValues: {
-            employeeId: employee?.employeeId || '',
             name: employee?.name || '',
             email: employee?.email || '',
             phone: employee?.phone || '',
             designation: employee?.designation || '',
             role: employee?.role || '',
             department: employee?.department || '',
+            position: employee?.position || '',
             joiningDate: employee?.joiningDate ? new Date(employee.joiningDate) : null,
+            salary: employee?.salary || '',
+            bankDetails: employee?.bankDetails || '',
             skills: employee?.skills || [],
             status: employee?.status || 'active',
             allowedWifiNetworks: employee?.allowedWifiNetworks || [{ ssid: '', macAddress: '' }],
@@ -65,12 +67,28 @@ const EmployeeForm = ({ employee = null }) => {
     const [skillInput, setSkillInput] = useState('');
     const [openSkillsCommand, setOpenSkillsCommand] = useState(false);
 
-    // Common options
+    // Updated options with proper values from the model
     const roleOptions = [
         { value: 'admin', label: 'Administrator' },
         { value: 'manager', label: 'Manager' },
         { value: 'employee', label: 'Employee' },
         { value: 'intern', label: 'Intern' }
+    ];
+
+    const designationOptions = [
+        { value: 'fullstack', label: 'Full Stack Developer' },
+        { value: 'frontend', label: 'Frontend Developer' },
+        { value: 'backend', label: 'Backend Developer' },
+        { value: 'designer', label: 'Designer' },
+        { value: 'hr', label: 'HR' },
+        { value: 'manager', label: 'Manager' }
+    ];
+
+    const positionOptions = [
+        { value: 'senior', label: 'Senior' },
+        { value: 'junior', label: 'Junior' },
+        { value: 'intern', label: 'Intern' },
+        { value: 'lead', label: 'Lead' }
     ];
 
     const departmentOptions = [
@@ -84,7 +102,8 @@ const EmployeeForm = ({ employee = null }) => {
     const statusOptions = [
         { value: 'active', label: 'Active' },
         { value: 'inactive', label: 'Inactive' },
-        { value: 'onLeave', label: 'On Leave' }
+        { value: 'on_leave', label: 'On Leave' },
+        { value: 'terminated', label: 'Terminated' }
     ];
 
     const commonSkills = [
@@ -143,18 +162,39 @@ const EmployeeForm = ({ employee = null }) => {
             setError('');
 
             const formData = new FormData();
+            
+            // Add role if not provided (default to 'employee')
+            if (!data.role) {
+                data.role = 'employee';
+            }
+
+            // Add userId if not editing (for new employees)
+            if (!isEdit) {
+                // Generate a userId based on name (e.g., john.doe)
+                const userId = data.name.toLowerCase()
+                    .replace(/[^a-z0-9]/g, ' ')
+                    .trim()
+                    .replace(/\s+/g, '.');
+                formData.append('userId', userId);
+                
+                // Generate a default password
+                formData.append('password', 'Welcome@123'); // This should be changed by the employee on first login
+            }
+
+            // Append all form data
             Object.keys(data).forEach(key => {
                 if (key === 'joiningDate') {
                     formData.append(key, data[key]?.toISOString() || '');
-                } else if (key === 'allowedWifiNetworks') {
+                } else if (key === 'allowedWifiNetworks' || key === 'skills') {
                     formData.append(key, JSON.stringify(data[key]));
-                } else if (key === 'skills') {
-                    formData.append(key, JSON.stringify(data[key]));
+                } else if (key === 'salary') {
+                    formData.append(key, Number(data[key]));
                 } else {
                     formData.append(key, data[key]);
                 }
             });
 
+            // Append files if present
             if (resumeFile) {
                 formData.append('resume', resumeFile);
             }
@@ -168,7 +208,7 @@ const EmployeeForm = ({ employee = null }) => {
             router.push('/employees');
         } catch (error) {
             console.error('Error submitting employee:', error);
-            setError('Failed to save employee');
+            setError(error.message || 'Failed to save employee');
         } finally {
             setLoading(false);
         }
@@ -251,47 +291,45 @@ const EmployeeForm = ({ employee = null }) => {
                     </Alert>
                 )}
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                    <Card>
-                        <CardContent className="p-6">
-                            <div className="grid gap-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Controller
-                                        name="employeeId"
-                                        control={control}
-                                        rules={{ required: 'Employee ID is required' }}
-                                        render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Employee ID</label>
-                                                <Input
-                                                    {...field}
-                                                    placeholder="Enter employee ID"
-                                                    error={errors.employeeId?.message}
-                                                />
-                                            </div>
-                                        )}
-                                    />
+                <Card>
+                    <CardContent className="p-6">
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Display Employee ID if editing */}
+                                {isEdit && (
+                                    <div className="col-span-2">
+                                        <label className="block text-sm font-medium mb-2">
+                                            Employee ID
+                                        </label>
+                                        <div className="text-lg font-semibold text-gray-700">
+                                            {employee.employeeId}
+                                        </div>
+                                    </div>
+                                )}
 
+                                {/* Name field */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Name</label>
                                     <Controller
                                         name="name"
                                         control={control}
                                         rules={{ required: 'Name is required' }}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Name</label>
-                                                <Input
-                                                    {...field}
-                                                    placeholder="Enter full name"
-                                                    error={errors.name?.message}
-                                                />
-                                            </div>
+                                            <Input
+                                                {...field}
+                                                placeholder="Enter full name"
+                                                error={errors.name?.message}
+                                            />
                                         )}
                                     />
+                                </div>
 
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Email</label>
                                     <Controller
                                         name="email"
                                         control={control}
-                                        rules={{
+                                        rules={{ 
                                             required: 'Email is required',
                                             pattern: {
                                                 value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
@@ -299,347 +337,421 @@ const EmployeeForm = ({ employee = null }) => {
                                             }
                                         }}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Email</label>
-                                                <Input
-                                                    {...field}
-                                                    type="email"
-                                                    placeholder="Enter email address"
-                                                    error={errors.email?.message}
-                                                />
-                                            </div>
+                                            <Input
+                                                {...field}
+                                                type="email"
+                                                placeholder="Enter email address"
+                                                error={errors.email?.message}
+                                            />
                                         )}
                                     />
+                                </div>
 
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Phone</label>
                                     <Controller
                                         name="phone"
                                         control={control}
                                         rules={{ required: 'Phone number is required' }}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Phone</label>
-                                                <Input
-                                                    {...field}
-                                                    placeholder="Enter phone number"
-                                                    error={errors.phone?.message}
-                                                />
-                                            </div>
+                                            <Input
+                                                {...field}
+                                                placeholder="Enter phone number"
+                                                error={errors.phone?.message}
+                                            />
                                         )}
                                     />
+                                </div>
 
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Designation</label>
                                     <Controller
                                         name="designation"
                                         control={control}
                                         rules={{ required: 'Designation is required' }}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Designation</label>
-                                                <Input
-                                                    {...field}
-                                                    placeholder="Enter designation"
-                                                    error={errors.designation?.message}
-                                                />
-                                            </div>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select designation" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {designationOptions.map(option => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         )}
                                     />
+                                </div>
 
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Position</label>
+                                    <Controller
+                                        name="position"
+                                        control={control}
+                                        rules={{ required: 'Position is required' }}
+                                        render={({ field }) => (
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select position" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {positionOptions.map(option => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Salary</label>
+                                    <Controller
+                                        name="salary"
+                                        control={control}
+                                        rules={{ 
+                                            required: 'Salary is required',
+                                            min: {
+                                                value: 0,
+                                                message: 'Salary must be greater than 0'
+                                            }
+                                        }}
+                                        render={({ field }) => (
+                                            <Input
+                                                {...field}
+                                                type="number"
+                                                placeholder="Enter salary"
+                                                error={errors.salary?.message}
+                                            />
+                                        )}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Bank Details</label>
+                                    <Controller
+                                        name="bankDetails"
+                                        control={control}
+                                        rules={{ required: 'Bank details are required' }}
+                                        render={({ field }) => (
+                                            <Input
+                                                {...field}
+                                                placeholder="Enter bank details"
+                                                error={errors.bankDetails?.message}
+                                            />
+                                        )}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Role</label>
                                     <Controller
                                         name="role"
                                         control={control}
                                         rules={{ required: 'Role is required' }}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Role</label>
-                                                <Select
-                                                    value={field.value}
-                                                    onValueChange={field.onChange}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select role" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {roleOptions.map(option => (
-                                                            <SelectItem
-                                                                key={option.value}
-                                                                value={option.value}
-                                                            >
-                                                                {option.label}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select role" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {roleOptions.map(option => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         )}
                                     />
+                                </div>
 
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Department</label>
                                     <Controller
                                         name="department"
                                         control={control}
                                         rules={{ required: 'Department is required' }}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Department</label>
-                                                <Select
-                                                    value={field.value}
-                                                    onValueChange={field.onChange}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select department" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {departmentOptions.map(option => (
-                                                            <SelectItem
-                                                                key={option.value}
-                                                                value={option.value}
-                                                            >
-                                                                {option.label}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        )}
-                                    />
-
-                                    <Controller
-                                        name="joiningDate"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Joining Date</label>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button
-                                                            variant="outline"
-                                                            className="w-full justify-start text-left font-normal"
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select department" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {departmentOptions.map(option => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
                                                         >
-                                                            {field.value ? (
-                                                                format(field.value, "PPP")
-                                                            ) : (
-                                                                <span>Pick a date</span>
-                                                            )}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0">
-                                                        <Calendar
-                                                            mode="single"
-                                                            selected={field.value}
-                                                            onSelect={field.onChange}
-                                                            initialFocus
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </div>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         )}
                                     />
+                                </div>
 
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Joining Date</label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                className="w-full justify-start text-left font-normal"
+                                            >
+                                                {watch('joiningDate') ? (
+                                                    format(watch('joiningDate'), "PPP")
+                                                ) : (
+                                                    <span>Pick a date</span>
+                                                )}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                            <Calendar
+                                                mode="single"
+                                                selected={watch('joiningDate')}
+                                                onSelect={(date) => {
+                                                    setValue('joiningDate', date);
+                                                }}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Status</label>
                                     <Controller
                                         name="status"
                                         control={control}
                                         rules={{ required: 'Status is required' }}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Status</label>
-                                                <Select
-                                                    value={field.value}
-                                                    onValueChange={field.onChange}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select status" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {statusOptions.map(option => (
-                                                            <SelectItem
-                                                                key={option.value}
-                                                                value={option.value}
-                                                            >
-                                                                {option.label}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select status" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {statusOptions.map(option => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         )}
                                     />
+                                </div>
 
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Reporting To</label>
                                     <Controller
                                         name="reportingTo"
                                         control={control}
                                         render={({ field }) => (
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Reporting To</label>
-                                                <Select
-                                                    value={field.value}
-                                                    onValueChange={field.onChange}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select manager" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {managers.map(manager => (
-                                                            <SelectItem
-                                                                key={manager._id}
-                                                                value={manager._id}
-                                                            >
-                                                                {manager.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select manager" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {managers.map(manager => (
+                                                        <SelectItem
+                                                            key={manager._id}
+                                                            value={manager._id}
+                                                        >
+                                                            {manager.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         )}
                                     />
                                 </div>
+                            </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Skills</label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="relative flex-1">
-                                            <Input
-                                                value={skillInput}
-                                                onChange={(e) => setSkillInput(e.target.value)}
-                                                onFocus={() => setOpenSkillsCommand(true)}
-                                                placeholder="Add skills"
-                                            />
-                                            {openSkillsCommand && (
-                                                <div className="absolute top-full left-0 w-full z-10">
-                                                    <Command>
-                                                        <CommandInput placeholder="Search skills..." />
-                                                        <CommandEmpty>No skills found.</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {commonSkills
-                                                                .filter(skill => 
-                                                                    skill.toLowerCase().includes(skillInput.toLowerCase()) &&
-                                                                    !watch('skills').includes(skill)
-                                                                )
-                                                                .map(skill => (
-                                                                    <CommandItem
-                                                                        key={skill}
-                                                                        onSelect={() => handleAddSkill(skill)}
-                                                                    >
-                                                                        {skill}
-                                                                    </CommandItem>
-                                                                ))
-                                                            }
-                                                        </CommandGroup>
-                                                    </Command>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => {
-                                                if (skillInput && !watch('skills').includes(skillInput)) {
-                                                    handleAddSkill(skillInput);
-                                                }
-                                            }}
-                                        >
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Add
-                                        </Button>
-                                    </div>
-                                    {watch('skills').length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {watch('skills').map((skill) => (
-                                                <Badge
-                                                    key={skill}
-                                                    variant="secondary"
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    {skill}
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-4 w-4 p-0"
-                                                        onClick={() => handleRemoveSkill(skill)}
-                                                    >
-                                                        <Minus className="h-3 w-3" />
-                                                    </Button>
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Resume</label>
-                                    <div className="flex items-center gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Skills</label>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative flex-1">
                                         <Input
-                                            type="file"
-                                            onChange={handleFileChange}
-                                            className="flex-1"
-                                            accept=".pdf,.doc,.docx"
+                                            value={skillInput}
+                                            onChange={(e) => setSkillInput(e.target.value)}
+                                            onFocus={() => setOpenSkillsCommand(true)}
+                                            placeholder="Add skills"
                                         />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => document.querySelector('input[type="file"]').click()}
-                                        >
-                                            <Upload className="h-4 w-4 mr-2" />
-                                            Upload
-                                        </Button>
-                                    </div>
-                                    {resumeFile && (
-                                        <p className="text-sm text-muted-foreground">
-                                            Selected file: {resumeFile.name}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-sm font-medium">Allowed WiFi Networks</label>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleAddWifiNetwork}
-                                        >
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            Add Network
-                                        </Button>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {watch('allowedWifiNetworks').map((_, index) => (
-                                            <div key={index} className="flex items-start gap-4">
-                                                <div className="flex-1 space-y-4">
-                                                    <Controller
-                                                        name={`allowedWifiNetworks.${index}.ssid`}
-                                                        control={control}
-                                                        render={({ field }) => (
-                                                            <Input
-                                                                {...field}
-                                                                placeholder="SSID"
-                                                            />
-                                                        )}
-                                                    />
-                                                    <Controller
-                                                        name={`allowedWifiNetworks.${index}.macAddress`}
-                                                        control={control}
-                                                        render={({ field }) => (
-                                                            <Input
-                                                                {...field}
-                                                                placeholder="MAC Address"
-                                                            />
-                                                        )}
-                                                    />
-                                                </div>
-                                                {index > 0 && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="mt-2"
-                                                        onClick={() => handleRemoveWifiNetwork(index)}
-                                                    >
-                                                        <Minus className="h-4 w-4" />
-                                                    </Button>
-                                                )}
+                                        {openSkillsCommand && (
+                                            <div className="absolute top-full left-0 w-full z-10">
+                                                <Command>
+                                                    <CommandInput placeholder="Search skills..." />
+                                                    <CommandEmpty>No skills found.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {commonSkills
+                                                            .filter(skill => 
+                                                                skill.toLowerCase().includes(skillInput.toLowerCase()) &&
+                                                                !watch('skills').includes(skill)
+                                                            )
+                                                            .map(skill => (
+                                                                <CommandItem
+                                                                    key={skill}
+                                                                    onSelect={() => handleAddSkill(skill)}
+                                                                >
+                                                                    {skill}
+                                                                </CommandItem>
+                                                            ))
+                                                        }
+                                                    </CommandGroup>
+                                                </Command>
                                             </div>
+                                        )}
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            if (skillInput && !watch('skills').includes(skillInput)) {
+                                                handleAddSkill(skillInput);
+                                            }
+                                        }}
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add
+                                    </Button>
+                                </div>
+                                {watch('skills').length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {watch('skills').map((skill) => (
+                                            <Badge
+                                                key={skill}
+                                                variant="secondary"
+                                                className="flex items-center gap-2"
+                                            >
+                                                {skill}
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 p-0"
+                                                    onClick={() => handleRemoveSkill(skill)}
+                                                >
+                                                    <Minus className="h-3 w-3" />
+                                                </Button>
+                                            </Badge>
                                         ))}
                                     </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Resume</label>
+                                <div className="flex items-center gap-4">
+                                    <Input
+                                        type="file"
+                                        onChange={handleFileChange}
+                                        className="flex-1"
+                                        accept=".pdf,.doc,.docx"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => document.querySelector('input[type="file"]').click()}
+                                    >
+                                        <Upload className="h-4 w-4 mr-2" />
+                                        Upload
+                                    </Button>
+                                </div>
+                                {resumeFile && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Selected file: {resumeFile.name}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-sm font-medium">Allowed WiFi Networks</label>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleAddWifiNetwork}
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Network
+                                    </Button>
+                                </div>
+                                <div className="space-y-4">
+                                    {watch('allowedWifiNetworks').map((_, index) => (
+                                        <div key={index} className="flex items-start gap-4">
+                                            <div className="flex-1 space-y-4">
+                                                <Controller
+                                                    name={`allowedWifiNetworks.${index}.ssid`}
+                                                    control={control}
+                                                    render={({ field }) => (
+                                                        <Input
+                                                            {...field}
+                                                            placeholder="SSID"
+                                                        />
+                                                    )}
+                                                />
+                                                <Controller
+                                                    name={`allowedWifiNetworks.${index}.macAddress`}
+                                                    control={control}
+                                                    render={({ field }) => (
+                                                        <Input
+                                                            {...field}
+                                                            placeholder="MAC Address"
+                                                        />
+                                                    )}
+                                                />
+                                            </div>
+                                            {index > 0 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="mt-2"
+                                                    onClick={() => handleRemoveWifiNetwork(index)}
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
@@ -659,9 +771,9 @@ const EmployeeForm = ({ employee = null }) => {
                                     {loading ? 'Saving...' : 'Save Employee'}
                                 </Button>
                             </div>
-                        </CardContent>
-                    </Card>
-                </form>
+                        </form>
+                    </CardContent>
+                </Card>
             </motion.div>
         </div>
     );

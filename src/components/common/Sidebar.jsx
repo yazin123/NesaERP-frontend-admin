@@ -33,7 +33,7 @@ const menuItems = [
         items: [
             { title: 'All Employees', href: '/employees' },
             { title: 'Add Employee', href: '/employees/create' },
-            { title: 'Teams', href: '/teams' }
+           
         ]
     },
     {
@@ -41,7 +41,7 @@ const menuItems = [
         icon: Briefcase,
         items: [
             { title: 'All Projects', href: '/projects' },
-            { title: 'Create Project', href: '/projects/create' },
+      
             { title: 'Kanban Board', href: '/projects/board' }
         ]
     },

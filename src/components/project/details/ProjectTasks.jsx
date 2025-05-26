@@ -24,7 +24,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Calendar, Clock, CheckCircle2, AlertCircle, Plus, Search } from 'lucide-react';
-import { api } from '@/api';
+import  api  from '@/api';
 import { useToast } from '@/hooks/use-toast';
 
 export function ProjectTasks({ projectId }) {

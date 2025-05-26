@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }) => {
   // Function to refresh user data
   const refreshUserData = async () => {
     try {
-      const response = await api.getCurrentAdmin();
+      const response = await api.getCurrentUser();
       const userData = response;
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -117,7 +117,12 @@ export const AuthProvider = ({ children }) => {
       // Initialize API with new token
       api.getToken();
       
-      router.push('/dashboard');
+      // Redirect based on user role
+      if (['superadmin', 'admin'].includes(userData.role)) {
+        router.push('/dashboard');
+      } else {
+        router.push('/employee/dashboard');
+      }
     } catch (error) {
       console.error('Login error:', error);
       throw error;

@@ -23,7 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Plus, X, Mail, Phone, Building } from 'lucide-react';
-import { api } from '@/api';
+import  api  from '@/api';
 import { useToast } from '@/hooks/use-toast';
 
 export function ProjectTeam({ projectId }) {

@@ -15,7 +15,7 @@ import {
   CalendarDays,
   Users,
 } from 'lucide-react';
-import { api } from '@/api';
+import  api  from '@/api';
 import { useToast } from '@/hooks/use-toast';
 
 export function ProjectTimeline({ projectId }) {

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { X, Plus, Trash2, Search } from 'lucide-react';
-import { api } from '@/api';
+import api from '@/api';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -31,7 +31,7 @@ export function CreateProjectDialog({ open, onOpenChange, onProjectCreated }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [matchingEmployees, setMatchingEmployees] = useState([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
-
+  const [employees, setEmployees] = useState([]);
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -62,6 +62,13 @@ export function CreateProjectDialog({ open, onOpenChange, onProjectCreated }) {
     } finally {
       setIsLoadingEmployees(false);
     }
+  };
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+  const fetchEmployees = async () => {
+    const data = await api.getProjectHeads();
+    setEmployees(data);
   };
 
   const handleInputChange = (field, value) => {
@@ -303,8 +310,11 @@ export function CreateProjectDialog({ open, onOpenChange, onProjectCreated }) {
                     <SelectValue placeholder="Select project head" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="john">John Doe</SelectItem>
-                    <SelectItem value="jane">Jane Smith</SelectItem>
+                  {employees?.users?.map((employee) => (
+                    <SelectItem key={employee._id} value={employee._id}>
+                      {employee.name}
+                    </SelectItem>
+                  ))}
                   </SelectContent>
                 </Select>
               </div>

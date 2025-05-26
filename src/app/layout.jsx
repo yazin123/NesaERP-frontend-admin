@@ -50,7 +50,7 @@ function RootLayoutContent({ children }) {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
-    }
+        }
 
     // Don't render layout for login page
     if (isLoginPage) {
@@ -64,25 +64,25 @@ function RootLayoutContent({ children }) {
     // Protected layout
     return (
         <div className={`min-h-screen ${inter.className}`}>
-            <div className="flex h-screen overflow-hidden">
+                <div className="flex h-screen overflow-hidden">
                 <Sidebar 
                     isOpen={isSidebarOpen} 
                     onClose={() => setIsSidebarOpen(false)} 
                 />
-                <div 
-                    className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+                    <div 
+                        className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
                         isSidebarOpen ? 'md:ml-64' : 'ml-0'
-                    }`}
-                >
+                        }`}
+                    >
                     <Header 
                         toggleSidebar={toggleSidebar} 
                         isSidebarOpen={isSidebarOpen}
                     />
-                    <main className="flex-1 overflow-auto bg-background p-6">
-                        {children}
-                    </main>
+                        <main className="flex-1 overflow-auto bg-background p-6">
+                            {children}
+                        </main>
+                    </div>
                 </div>
-            </div>
             <Toaster />
         </div>
     );

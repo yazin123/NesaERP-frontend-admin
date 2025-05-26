@@ -12,7 +12,9 @@ import {
     MoreHorizontal,
     Mail,
     Phone,
-    Building
+    Building,
+    Grid,
+    List
 } from 'lucide-react';
 
 import { useRouter } from 'next/navigation';
@@ -67,32 +69,51 @@ const EmployeeList = () => {
     
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [totalCount, setTotalCount] = useState(0);
     const [filters, setFilters] = useState({
         department: '',
+        designation: '',
         role: '',
+        position: '',
         search: '',
         page: 1,
-        rowsPerPage: 10
+        limit: 10,
+        sortBy: 'name',
+        order: 'asc'
     });
     const [showFilters, setShowFilters] = useState(false);
-    const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+    const [viewMode, setViewMode] = useState('table');
 
-    // Department options
+    // Updated options from User model
+    const designationOptions = [
+        { value: 'fullstack', label: 'Full Stack Developer' },
+        { value: 'frontend', label: 'Frontend Developer' },
+        { value: 'backend', label: 'Backend Developer' },
+        { value: 'designer', label: 'Designer' },
+        { value: 'hr', label: 'HR' },
+        { value: 'manager', label: 'Manager' }
+    ];
+
     const departmentOptions = [
         { value: 'engineering', label: 'Engineering' },
         { value: 'design', label: 'Design' },
         { value: 'marketing', label: 'Marketing' },
         { value: 'sales', label: 'Sales' },
-        { value: 'hr', label: 'HR' }
+        { value: 'hr', label: 'Human Resources' }
     ];
 
-    // Role options
     const roleOptions = [
-        { value: 'developer', label: 'Developer' },
-        { value: 'designer', label: 'Designer' },
+        { value: 'admin', label: 'Administrator' },
         { value: 'manager', label: 'Manager' },
-        { value: 'lead', label: 'Team Lead' },
+        { value: 'employee', label: 'Employee' },
         { value: 'intern', label: 'Intern' }
+    ];
+
+    const positionOptions = [
+        { value: 'senior', label: 'Senior' },
+        { value: 'junior', label: 'Junior' },
+        { value: 'intern', label: 'Intern' },
+        { value: 'lead', label: 'Lead' }
     ];
 
     useEffect(() => {
@@ -103,7 +124,8 @@ const EmployeeList = () => {
         try {
             setLoading(true);
             const response = await api.getEmployees(filters);
-            setEmployees(response.data);
+            setEmployees(response.users || []);
+            setTotalCount(response.total || 0);
         } catch (error) {
             console.error('Error fetching employees:', error);
         } finally {
@@ -112,13 +134,13 @@ const EmployeeList = () => {
     };
 
     const handleFilterChange = (field, value) => {
-        setFilters(prev => ({ ...prev, [field]: value }));
+        setFilters(prev => ({ ...prev, [field]: value, page: 1 }));
     };
 
     const handleDeleteEmployee = async (id) => {
         if (window.confirm('Are you sure you want to delete this employee?')) {
             try {
-                await employeeService.deleteEmployee(id);
+                await api.deleteEmployee(id);
                 fetchEmployees();
             } catch (error) {
                 console.error('Error deleting employee:', error);
@@ -126,291 +148,331 @@ const EmployeeList = () => {
         }
     };
 
-    const filteredEmployees = employees.filter(employee =>
-        employee.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        employee.email.toLowerCase().includes(filters.search.toLowerCase())
-    );
+    const handlePageChange = (page) => {
+        setFilters(prev => ({ ...prev, page }));
+    };
 
-    const paginatedEmployees = filteredEmployees.slice(
-        (filters.page - 1) * filters.rowsPerPage,
-        filters.page * filters.rowsPerPage
-    );
-
-    const totalPages = Math.ceil(filteredEmployees.length / filters.rowsPerPage);
-
-    const renderTableView = () => (
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Contact</TableHead>
-                        <TableHead>Department</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Join Date</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {paginatedEmployees.map((employee) => (
-                        <TableRow key={employee._id}>
-                            <TableCell>
-                                <div className="flex items-center gap-3">
-                                    <Avatar>
-                                        <AvatarImage src={employee.avatar} alt={employee.name} />
-                                        <AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <div className="font-medium">{employee.name}</div>
-                                        <div className="text-sm text-muted-foreground">{employee.employeeId}</div>
-                                    </div>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-sm">{employee.email}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Phone className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-sm">{employee.phone}</span>
-                                    </div>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant="outline">
-                                    <Building className="mr-1 h-3 w-3" />
-                                    {employee.department}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant="secondary">{employee.role}</Badge>
-                            </TableCell>
-                            <TableCell>{format(new Date(employee.joinDate), 'PP')}</TableCell>
-                            <TableCell className="text-right">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem asChild>
-                                            <Link href={`/employees/${employee._id}`}>
-                                                View Profile
-                                            </Link>
-                                        </DropdownMenuItem>
-                                        {user?.role === 'admin' && (
-                                            <>
-                                                <DropdownMenuItem asChild>
-                                                    <Link href={`/employees/${employee._id}/edit`}>
-                                                        <Edit className="mr-2 h-4 w-4" />
-                                                        Edit
-                                                    </Link>
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    className="text-destructive"
-                                                    onClick={() => handleDeleteEmployee(employee._id)}
-                                                >
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Delete
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    );
-
-    const renderGridView = () => (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedEmployees.map((employee) => (
-                <Card key={employee._id}>
-                    <CardHeader className="flex flex-row items-center gap-4">
-                        <Avatar className="h-14 w-14">
-                            <AvatarImage src={employee.avatar} alt={employee.name} />
-                            <AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <CardTitle>{employee.name}</CardTitle>
-                            <CardDescription>{employee.employeeId}</CardDescription>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm">
-                                <Mail className="h-4 w-4 text-muted-foreground" />
-                                <span>{employee.email}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                <span>{employee.phone}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Building className="h-4 w-4 text-muted-foreground" />
-                                <span>{employee.department}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Badge variant="outline">{employee.role}</Badge>
-                            <Badge variant="secondary">
-                                Joined {format(new Date(employee.joinDate), 'PP')}
-                            </Badge>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="sm" asChild>
-                                <Link href={`/employees/${employee._id}`}>View Profile</Link>
-                            </Button>
-                            {user?.role === 'admin' && (
-                                <>
-                                    <Button variant="ghost" size="sm" asChild>
-                                        <Link href={`/employees/${employee._id}/edit`}>
-                                            <Edit className="mr-2 h-4 w-4" />
-                                            Edit
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive"
-                                        onClick={() => handleDeleteEmployee(employee._id)}
-                                    >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
-    );
+    const totalPages = Math.ceil(totalCount / filters.limit);
 
     return (
         <div className="p-6 space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">Employees</h1>
-                {user?.role === 'admin' && (
-                    <Button asChild>
-                        <Link href="/employees/create">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Employee
-                        </Link>
-                    </Button>
-                )}
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">Employees</h1>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setViewMode('table')}
+                        >
+                            <List className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                            size="icon"
+                            onClick={() => setViewMode('grid')}
+                        >
+                            <Grid className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    {user?.role === 'admin' && (
+                        <Button asChild>
+                            <Link href="/employees/create">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Employee
+                            </Link>
+                        </Button>
+                    )}
+                </div>
             </div>
 
-            <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="search"
-                            placeholder="Search employees..."
-                            value={filters.search}
-                            onChange={(e) => handleFilterChange('search', e.target.value)}
-                            className="pl-9"
-                        />
-                    </div>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setShowFilters(!showFilters)}
-                    >
-                        <Filter className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-                    >
-                        {viewMode === 'table' ? 'Grid View' : 'Table View'}
-                    </Button>
+            <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                    <Input
+                        placeholder="Search employees..."
+                        value={filters.search}
+                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                        className="max-w-sm"
+                    />
                 </div>
+                <Button
+                    variant="outline"
+                    onClick={() => setShowFilters(!showFilters)}
+                >
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filters
+                </Button>
+            </div>
 
-                <AnimatePresence>
-                    {showFilters && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="flex gap-4"
-                        >
-                            <Select
-                                value={filters.department}
-                                onValueChange={(value) => handleFilterChange('department', value)}
-                            >
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Department" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">All</SelectItem>
-                                    {departmentOptions.map(option => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+            {showFilters && (
+                <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="grid grid-cols-1 md:grid-cols-4 gap-4"
+                >
+                    <Select
+                        value={filters.department}
+                        onValueChange={(value) => handleFilterChange('department', value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">All Departments</SelectItem>
+                            {departmentOptions.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
-                            <Select
-                                value={filters.role}
-                                onValueChange={(value) => handleFilterChange('role', value)}
-                            >
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">All</SelectItem>
-                                    {roleOptions.map(option => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                    <Select
+                        value={filters.designation}
+                        onValueChange={(value) => handleFilterChange('designation', value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Designation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">All Designations</SelectItem>
+                            {designationOptions.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
-                {viewMode === 'table' ? renderTableView() : renderGridView()}
+                    <Select
+                        value={filters.role}
+                        onValueChange={(value) => handleFilterChange('role', value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">All Roles</SelectItem>
+                            {roleOptions.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
+                    <Select
+                        value={filters.position}
+                        onValueChange={(value) => handleFilterChange('position', value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">All Positions</SelectItem>
+                            {positionOptions.map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </motion.div>
+            )}
+
+            {loading ? (
+                <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                        <div key={i} className="h-20 bg-muted rounded-lg animate-pulse" />
+                    ))}
+                </div>
+            ) : viewMode === 'table' ? (
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Employee</TableHead>
+                                <TableHead>Contact</TableHead>
+                                <TableHead>Department</TableHead>
+                                <TableHead>Designation</TableHead>
+                                <TableHead>Position</TableHead>
+                                <TableHead>Join Date</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {employees.map((employee) => (
+                                <TableRow key={employee._id}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                            <Avatar>
+                                                <AvatarImage src={employee.photo} alt={employee.name} />
+                                                <AvatarFallback>{employee.name.charAt(0).toUpperCase()}</AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <div className="font-medium">{employee.name}</div>
+                                                <div className="text-sm text-muted-foreground">{employee.employeeId}</div>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <Mail className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm">{employee.email}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Phone className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm">{employee.phone}</span>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">
+                                            <Building className="mr-1 h-3 w-3" />
+                                            {employee.department}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge>{employee.designation}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="secondary">{employee.position}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        {employee.dateOfJoining ? format(new Date(employee.dateOfJoining), 'PP') : 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/employees/${employee._id}`}>
+                                                        View Profile
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                {user?.role === 'admin' && (
+                                                    <>
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/employees/${employee._id}/edit`}>
+                                                                <Edit className="mr-2 h-4 w-4" />
+                                                                Edit
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            className="text-destructive"
+                                                            onClick={() => handleDeleteEmployee(employee._id)}
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {employees.map((employee) => (
+                        <Card key={employee._id}>
+                            <CardHeader className="flex flex-row items-center gap-4">
+                                <Avatar className="h-14 w-14">
+                                    <AvatarImage src={employee.photo} alt={employee.name} />
+                                    <AvatarFallback>{employee.name.charAt(0).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <CardTitle>{employee.name}</CardTitle>
+                                    <CardDescription>{employee.employeeId}</CardDescription>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Mail className="h-4 w-4 text-muted-foreground" />
+                                        <span>{employee.email}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Phone className="h-4 w-4 text-muted-foreground" />
+                                        <span>{employee.phone}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Building className="h-4 w-4 text-muted-foreground" />
+                                        <span>{employee.department}</span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <Badge>{employee.designation}</Badge>
+                                    <Badge variant="secondary">{employee.position}</Badge>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" size="sm" asChild>
+                                        <Link href={`/employees/${employee._id}`}>
+                                            View Profile
+                                        </Link>
+                                    </Button>
+                                    {user?.role === 'admin' && (
+                                        <>
+                                            <Button variant="ghost" size="sm" asChild>
+                                                <Link href={`/employees/${employee._id}/edit`}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Link>
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDeleteEmployee(employee._id)}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
+            {totalPages > 1 && (
                 <Pagination>
                     <PaginationContent>
                         <PaginationItem>
                             <PaginationPrevious
-                                onClick={() => handleFilterChange('page', Math.max(1, filters.page - 1))}
+                                onClick={() => handlePageChange(filters.page - 1)}
                                 disabled={filters.page === 1}
                             />
                         </PaginationItem>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                            <PaginationItem key={pageNum}>
+                        {[...Array(totalPages)].map((_, i) => (
+                            <PaginationItem key={i + 1}>
                                 <PaginationLink
-                                    onClick={() => handleFilterChange('page', pageNum)}
-                                    isActive={filters.page === pageNum}
+                                    onClick={() => handlePageChange(i + 1)}
+                                    isActive={filters.page === i + 1}
                                 >
-                                    {pageNum}
+                                    {i + 1}
                                 </PaginationLink>
                             </PaginationItem>
                         ))}
                         <PaginationItem>
                             <PaginationNext
-                                onClick={() => handleFilterChange('page', Math.min(totalPages, filters.page + 1))}
+                                onClick={() => handlePageChange(filters.page + 1)}
                                 disabled={filters.page === totalPages}
                             />
                         </PaginationItem>
                     </PaginationContent>
                 </Pagination>
-            </div>
+            )}
         </div>
     );
 };
