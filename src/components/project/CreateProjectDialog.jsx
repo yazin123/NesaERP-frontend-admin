@@ -1,91 +1,152 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Trash2, Search } from 'lucide-react';
-import api from '@/api';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon, Check, X, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
+import api from '@/api';
 
-export function CreateProjectDialog({ open, onOpenChange, onProjectCreated }) {
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [matchingEmployees, setMatchingEmployees] = useState([]);
-  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
-  const [employees, setEmployees] = useState([]);
-  // Form state
+export function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     projectHead: '',
+    members: [],
     techStack: [],
-    contacts: [{ name: '', phone: '' }],
-    dates: [{ name: '', date: '' }],
-    developmentPhases: [{ phasename: '', startdate: '', enddate: '' }]
+    startDate: new Date(),
+    endDate: new Date(),
+    priority: 'medium',
+    status: 'planning',
+    developmentPhases: []
+  });
+  const [users, setUsers] = useState([]);
+  const [showMembersCommand, setShowMembersCommand] = useState(false);
+  const [showTechStackCommand, setShowTechStackCommand] = useState(false);
+  const { toast } = useToast();
+  const [showPhaseDialog, setShowPhaseDialog] = useState(false);
+  const [newPhase, setNewPhase] = useState({
+    name: '',
+    startDate: '',
+    endDate: ''
   });
 
-  // Tech stack input state
-  const [newTech, setNewTech] = useState('');
-
+  // Fetch users for project head and members selection
   useEffect(() => {
-    if (formData.techStack.length > 0) {
-      fetchMatchingEmployees();
-    }
-  }, [formData.techStack]);
-
-  const fetchMatchingEmployees = async () => {
-    try {
-      setIsLoadingEmployees(true);
-      const data = await api.getMatchingEmployees(formData.techStack);
-      setMatchingEmployees(data);
-    } catch (err) {
-      console.error('Failed to fetch matching employees:', err);
-    } finally {
-      setIsLoadingEmployees(false);
-    }
-  };
-  useEffect(() => {
-    fetchEmployees();
+    fetchUsers();
   }, []);
-  const fetchEmployees = async () => {
-    const data = await api.getProjectHeads();
-    setEmployees(data);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await api.admin.getAllUsers();
+      if (response?.data?.users) {
+        setUsers(response.data.users.map(user => ({
+          value: user._id,
+          label: user.name
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch users',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleInputChange = (field, value) => {
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await api.admin.createProject(formData);
+      
+      if (response?.data?.success) {
+        toast({
+          title: 'Success',
+          description: 'Project created successfully'
+        });
+        onSuccess?.();
+        onOpenChange(false);
+        setFormData({
+          name: '',
+          description: '',
+          projectHead: '',
+          members: [],
+          techStack: [],
+          startDate: new Date(),
+          endDate: new Date(),
+          priority: 'medium',
+          status: 'planning',
+          developmentPhases: []
+        });
+      } else {
+        throw new Error(response?.data?.message || 'Failed to create project');
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create project',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Tech stack options
+  const techStackOptions = [
+    { value: 'react', label: 'React' },
+    { value: 'node', label: 'Node.js' },
+    { value: 'python', label: 'Python' },
+    { value: 'django', label: 'Django' },
+    { value: 'angular', label: 'Angular' },
+    { value: 'vue', label: 'Vue.js' },
+    { value: 'java', label: 'Java' },
+    { value: 'spring', label: 'Spring' },
+    { value: 'dotnet', label: '.NET' },
+    { value: 'php', label: 'PHP' },
+    { value: 'laravel', label: 'Laravel' },
+    { value: 'flutter', label: 'Flutter' },
+    { value: 'react-native', label: 'React Native' }
+  ];
+
+  const toggleMember = (member) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      members: prev.members.includes(member.value)
+        ? prev.members.filter(id => id !== member.value)
+        : [...prev.members, member.value]
     }));
   };
 
-  const addTechStack = (tech) => {
-    if (tech && !formData.techStack.includes(tech)) {
-      setFormData(prev => ({
-        ...prev,
-        techStack: [...prev.techStack, tech]
-      }));
-      setNewTech('');
-    }
+  const toggleTechStack = (tech) => {
+    setFormData(prev => ({
+      ...prev,
+      techStack: prev.techStack.includes(tech.value)
+        ? prev.techStack.filter(t => t !== tech.value)
+        : [...prev.techStack, tech.value]
+    }));
+  };
+
+  const removeMember = (memberId) => {
+    setFormData(prev => ({
+      ...prev,
+      members: prev.members.filter(id => id !== memberId)
+    }));
   };
 
   const removeTechStack = (tech) => {
@@ -95,396 +156,386 @@ export function CreateProjectDialog({ open, onOpenChange, onProjectCreated }) {
     }));
   };
 
-  const addContact = () => {
+  const handleAddPhase = (e) => {
+    e.preventDefault();
+    if (!newPhase.name || !newPhase.startDate || !newPhase.endDate) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all phase fields',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
-      contacts: [...prev.contacts, { name: '', phone: '' }]
+      developmentPhases: [...prev.developmentPhases, newPhase]
     }));
+    setNewPhase({ name: '', startDate: '', endDate: '' });
+    setShowPhaseDialog(false);
   };
 
-  const updateContact = (index, field, value) => {
-    setFormData(prev => {
-      const newContacts = [...prev.contacts];
-      newContacts[index] = { ...newContacts[index], [field]: value };
-      return { ...prev, contacts: newContacts };
-    });
-  };
-
-  const removeContact = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      contacts: prev.contacts.filter((_, i) => i !== index)
-    }));
-  };
-
-  const addProjectDate = () => {
-    setFormData(prev => ({
-      ...prev,
-      dates: [...prev.dates, { name: '', date: '' }]
-    }));
-  };
-
-  const updateProjectDate = (index, field, value) => {
-    setFormData(prev => {
-      const newDates = [...prev.dates];
-      newDates[index] = { ...newDates[index], [field]: value };
-      return { ...prev, dates: newDates };
-    });
-  };
-
-  const removeProjectDate = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      dates: prev.dates.filter((_, i) => i !== index)
-    }));
-  };
-
-  const addDevelopmentPhase = () => {
-    setFormData(prev => ({
-      ...prev,
-      developmentPhases: [...prev.developmentPhases, { phasename: '', startdate: '', enddate: '' }]
-    }));
-  };
-
-  const updateDevelopmentPhase = (index, field, value) => {
-    setFormData(prev => {
-      const newPhases = [...prev.developmentPhases];
-      newPhases[index] = { ...newPhases[index], [field]: value };
-      return { ...prev, developmentPhases: newPhases };
-    });
-  };
-
-  const removeDevelopmentPhase = (index) => {
+  const removePhase = (index) => {
     setFormData(prev => ({
       ...prev,
       developmentPhases: prev.developmentPhases.filter((_, i) => i !== index)
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      setIsSubmitting(true);
-
-      // Validate required fields
-      if (!formData.name || !formData.description || !formData.projectHead) {
-        throw new Error('Please fill in all required fields');
-      }
-
-      // Create project data structure
-      const projectData = {
-        ...formData,
-        pipeline: {
-          phases: [
-            { name: 'Requirement Gathering', status: 'pending' },
-            { name: 'Architect Creation', status: 'pending' },
-            { name: 'Architect Submission', status: 'pending' },
-            ...formData.developmentPhases.map(phase => ({
-              name: phase.phasename,
-              status: 'pending',
-              startDate: phase.startdate,
-              endDate: phase.enddate
-            }))
-          ]
-        }
-      };
-
-      // Submit to API
-      const response = await api.createProject(projectData);
-
-      toast({
-        title: 'Success',
-        description: 'Project created successfully',
-      });
-
-      // Reset form and close dialog
-      setFormData({
-        name: '',
-        description: '',
-        projectHead: '',
-        techStack: [],
-        contacts: [{ name: '', phone: '' }],
-        dates: [{ name: '', date: '' }],
-        developmentPhases: [{ phasename: '', startdate: '', enddate: '' }]
-      });
-      
-      onProjectCreated?.(response);
-      onOpenChange(false);
-
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err.message || 'Failed to create project. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Add a new project to your organization. Fill in all the required information.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-6 py-4">
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Basic Information</h3>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Project name"
-                  className="col-span-3"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Project description"
-                  className="col-span-3"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  required
-                />
-              </div>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Create New Project</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Project Name</label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter project name"
+                required
+              />
             </div>
 
-            {/* Point of Contact */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Point of Contact</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addContact}>
-                  <Plus className="h-4 w-4 mr-2" />Add Contact
-                </Button>
-              </div>
-              {formData.contacts.map((contact, index) => (
-                <div key={index} className="grid grid-cols-8 gap-4 items-center">
-                  <Label className="text-right col-span-1">Contact {index + 1}</Label>
-                  <Input
-                    placeholder="Name"
-                    className="col-span-3"
-                    value={contact.name}
-                    onChange={(e) => updateContact(index, 'name', e.target.value)}
-                  />
-                  <Input
-                    placeholder="Phone"
-                    className="col-span-3"
-                    value={contact.phone}
-                    onChange={(e) => updateContact(index, 'phone', e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="col-span-1"
-                    onClick={() => removeContact(index)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
-              ))}
+            <div>
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter project description"
+                required
+              />
             </div>
 
-            {/* Project Head & Tech Stack */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Project Team</h3>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="projectHead" className="text-right">Project Head</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Project Head</label>
                 <Select
                   value={formData.projectHead}
-                  onValueChange={(value) => handleInputChange('projectHead', value)}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, projectHead: value }))}
+                  required
                 >
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select project head" />
                   </SelectTrigger>
                   <SelectContent>
-                  {employees?.users?.map((employee) => (
-                    <SelectItem key={employee._id} value={employee._id}>
-                      {employee.name}
-                    </SelectItem>
-                  ))}
+                    {users.map(user => (
+                      <SelectItem key={user.value} value={user.value}>
+                        {user.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label className="text-right mt-3">Tech Stack</Label>
-                <div className="col-span-3 space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      value={newTech}
-                      onChange={(e) => setNewTech(e.target.value)}
-                      placeholder="Add technology"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addTechStack(newTech);
-                        }
-                      }}
-                    />
-                    <Button type="button" variant="secondary" onClick={() => addTechStack(newTech)}>
-                      Add
+
+              <div>
+                <label className="text-sm font-medium">Team Members</label>
+                <Popover open={showMembersCommand} onOpenChange={setShowMembersCommand}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      Select members
                     </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search members..." />
+                      <CommandEmpty>No members found.</CommandEmpty>
+                      <CommandGroup>
+                        {users.map((user) => (
+                          <CommandItem
+                            key={user.value}
+                            onSelect={() => toggleMember(user)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.members.includes(user.value)
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            {user.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {formData.members.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.members.map(memberId => {
+                      const user = users.find(u => u.value === memberId);
+                      return (
+                        <Badge key={memberId} variant="secondary" className="flex items-center gap-1">
+                          {user?.label}
+                          <X
+                            className="h-3 w-3 cursor-pointer"
+                            onClick={() => removeMember(memberId)}
+                          />
+                        </Badge>
+                      );
+                    })}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.techStack.map((tech) => (
-                      <Badge key={tech} variant="secondary" className="flex items-center gap-1">
-                        {tech}
-                        <X className="h-3 w-3 cursor-pointer" onClick={() => removeTechStack(tech)} />
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {/* Matching Employees Section */}
-                  {formData.techStack.length > 0 && (
-                    <div className="mt-4 border rounded-lg p-4">
-                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                        <Search className="h-4 w-4" />
-                        Matching Employees
-                      </h4>
-                      {isLoadingEmployees ? (
-                        <div className="space-y-2">
-                          <Skeleton className="h-8 w-full" />
-                          <Skeleton className="h-8 w-full" />
-                          <Skeleton className="h-8 w-full" />
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {matchingEmployees.map((employee) => (
-                            <div
-                              key={employee.id}
-                              className="flex items-center justify-between p-2 bg-muted rounded-md"
-                            >
-                              <div>
-                                <p className="text-sm font-medium">{employee.name}</p>
-                                <p className="text-xs text-muted-foreground">{employee.designation}</p>
-                              </div>
-                              <div className="flex gap-2">
-                                {employee.skills.map((skill) => (
-                                  <Badge key={skill} variant="outline" className="text-xs">
-                                    {skill}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Project Dates */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Project Dates</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addProjectDate}>
-                  <Plus className="h-4 w-4 mr-2" />Add Date
-                </Button>
-              </div>
-              {formData.dates.map((projectDate, index) => (
-                <div key={index} className="grid grid-cols-8 gap-4 items-center">
-                  <Input
-                    placeholder="Date Name (e.g., Start Date)"
-                    className="col-span-3"
-                    value={projectDate.name}
-                    onChange={(e) => updateProjectDate(index, 'name', e.target.value)}
-                  />
-                  <Input
-                    type="date"
-                    className="col-span-4"
-                    value={projectDate.date}
-                    onChange={(e) => updateProjectDate(index, 'date', e.target.value)}
-                  />
+            <div>
+              <label className="text-sm font-medium">Tech Stack</label>
+              <Popover open={showTechStackCommand} onOpenChange={setShowTechStackCommand}>
+                <PopoverTrigger asChild>
                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeProjectDate(index)}
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
                   >
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                    Select technologies
                   </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search technologies..." />
+                    <CommandEmpty>No technologies found.</CommandEmpty>
+                    <CommandGroup>
+                      {techStackOptions.map((tech) => (
+                        <CommandItem
+                          key={tech.value}
+                          onSelect={() => toggleTechStack(tech)}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.techStack.includes(tech.value)
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {tech.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {formData.techStack.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.techStack.map(tech => {
+                    const techOption = techStackOptions.find(t => t.value === tech);
+                    return (
+                      <Badge key={tech} variant="secondary" className="flex items-center gap-1">
+                        {techOption?.label}
+                        <X
+                          className="h-3 w-3 cursor-pointer"
+                          onClick={() => removeTechStack(tech)}
+                        />
+                      </Badge>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
             </div>
 
-            {/* Project Pipeline */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Project Pipeline</h3>
-              <div className="space-y-2">
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="col-span-4 p-3 bg-muted rounded-lg">
-                    <p className="font-medium">Fixed Phases:</p>
-                    <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>Requirement Gathering</li>
-                      <li>Architect Creation</li>
-                      <li>Architect Submission</li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center mt-4">
-                  <p className="font-medium">Development Phases</p>
-                  <Button type="button" variant="outline" size="sm" onClick={addDevelopmentPhase}>
-                    <Plus className="h-4 w-4 mr-2" />Add Phase
-                  </Button>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Start Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.startDate ? format(formData.startDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.startDate}
+                      onSelect={(date) => setFormData(prev => ({ ...prev, startDate: date }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">End Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.endDate ? format(formData.endDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.endDate}
+                      onSelect={(date) => setFormData(prev => ({ ...prev, endDate: date }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Priority</label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Status</label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planning">Planning</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="on-hold">On Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Development Phases</label>
+              <div className="mt-2 space-y-2">
                 {formData.developmentPhases.map((phase, index) => (
-                  <div key={index} className="grid grid-cols-8 gap-4 items-center">
-                    <Input
-                      placeholder="Phase Name"
-                      className="col-span-2"
-                      value={phase.phasename}
-                      onChange={(e) => updateDevelopmentPhase(index, 'phasename', e.target.value)}
-                    />
-                    <Input
-                      type="date"
-                      className="col-span-2"
-                      value={phase.startdate}
-                      onChange={(e) => updateDevelopmentPhase(index, 'startdate', e.target.value)}
-                    />
-                    <Input
-                      type="date"
-                      className="col-span-2"
-                      value={phase.enddate}
-                      onChange={(e) => updateDevelopmentPhase(index, 'enddate', e.target.value)}
-                    />
+                  <div key={index} className="flex items-center justify-between p-2 border rounded">
+                    <div>
+                      <span className="font-medium">{phase.name}</span>
+                      <span className="text-sm text-muted-foreground ml-2">
+                        {new Date(phase.startDate).toLocaleDateString()} →{' '}
+                        {new Date(phase.endDate).toLocaleDateString()}
+                      </span>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="col-span-1"
-                      onClick={() => removeDevelopmentPhase(index)}
+                      size="sm"
+                      onClick={() => removePhase(index)}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowPhaseDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Development Phase
+                </Button>
               </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Project'}
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Creating...' : 'Create Project'}
             </Button>
           </DialogFooter>
         </form>
+
+        {/* Add Phase Dialog */}
+        <Dialog open={showPhaseDialog} onOpenChange={setShowPhaseDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Development Phase</DialogTitle>
+              <DialogDescription>
+                Add a new phase to the project development pipeline.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAddPhase} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phase Name</label>
+                <Input
+                  value={newPhase.name}
+                  onChange={(e) => setNewPhase(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Enter phase name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Start Date</label>
+                <Input
+                  type="date"
+                  value={newPhase.startDate}
+                  onChange={(e) => setNewPhase(prev => ({ ...prev, startDate: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">End Date</label>
+                <Input
+                  type="date"
+                  value={newPhase.endDate}
+                  onChange={(e) => setNewPhase(prev => ({ ...prev, endDate: e.target.value }))}
+                  required
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowPhaseDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  Add Phase
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

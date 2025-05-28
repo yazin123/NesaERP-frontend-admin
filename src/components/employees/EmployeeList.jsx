@@ -72,10 +72,10 @@ const EmployeeList = () => {
     const [loading, setLoading] = useState(true);
     const [totalCount, setTotalCount] = useState(0);
     const [filters, setFilters] = useState({
-        department: '',
-        designation: '',
-        role: '',
-        position: '',
+        department: 'all',
+        designation: 'all',
+        role: 'all',
+        position: 'all',
         search: '',
         page: 1,
         limit: 10,
@@ -124,6 +124,7 @@ const EmployeeList = () => {
     const fetchEmployees = async () => {
         try {
             setLoading(true);
+            console.log("filters", filters);
             const response = await api.admin.getEmployees(filters);
             if (response) {
                 console.log("response", response.data);
@@ -143,7 +144,9 @@ const EmployeeList = () => {
     };
 
     const handleFilterChange = (field, value) => {
-        setFilters(prev => ({ ...prev, [field]: value, page: 1 }));
+        // If value is 'all', don't include it in the filters
+        const newValue = value === 'all' ? '' : value;
+        setFilters(prev => ({ ...prev, [field]: newValue, page: 1 }));
     };
 
     const handleDeleteEmployee = async (id) => {
@@ -238,7 +241,7 @@ const EmployeeList = () => {
                             <SelectValue placeholder="Department" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Departments</SelectItem>
+                            <SelectItem value="all">All Departments</SelectItem>
                             {departmentOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>
                                     {option.label}
@@ -255,7 +258,7 @@ const EmployeeList = () => {
                             <SelectValue placeholder="Designation" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Designations</SelectItem>
+                            <SelectItem value="all">All Designations</SelectItem>
                             {designationOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>
                                     {option.label}
@@ -272,7 +275,7 @@ const EmployeeList = () => {
                             <SelectValue placeholder="Role" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Roles</SelectItem>
+                            <SelectItem value="all">All Roles</SelectItem>
                             {roleOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>
                                     {option.label}
@@ -289,7 +292,7 @@ const EmployeeList = () => {
                             <SelectValue placeholder="Position" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Positions</SelectItem>
+                            <SelectItem value="all">All Positions</SelectItem>
                             {positionOptions.map(option => (
                                 <SelectItem key={option.value} value={option.value}>
                                     {option.label}

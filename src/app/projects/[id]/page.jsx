@@ -1,44 +1,52 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import  api  from '@/api';
+import { useParams, useRouter } from 'next/navigation';
+import api from '@/api';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectOverview } from '@/components/project/details/ProjectOverview';
 import { ProjectTasks } from '@/components/project/details/ProjectTasks';
 import { ProjectTeam } from '@/components/project/details/ProjectTeam';
-import { ProjectTimeline } from '@/components/project/details/ProjectTimeline';
+import { ProjectReports } from '@/components/project/details/ProjectReports';
 import { ProjectDocuments } from '@/components/project/details/ProjectDocuments';
+import { ProjectPipeline } from '@/components/project/details/ProjectPipeline';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bell, BellOff } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ProjectDetailsPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const router = useRouter();
+  const { toast } = useToast();
   const [project, setProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
-    fetchProjectDetails();
-  }, [id]);
+    if (params.id) {
+      fetchProjectDetails();
+    }
+  }, [params.id]);
 
   const fetchProjectDetails = async () => {
     try {
       setIsLoading(true);
-      const data = await api.getProjectById(id);
-      setProject(data);
-      setIsSubscribed(data.isSubscribed);
       setError(null);
+      const response = await api.admin.getProjectById(params.id);
+      
+      if (response?.data?.data) {
+        setProject(response.data.data);
+      } else {
+        throw new Error('Project not found');
+      }
     } catch (err) {
-      setError('Failed to fetch project details');
+      console.error('Error fetching project:', err);
+      setError(err.message || 'Failed to fetch project details');
       toast({
         title: 'Error',
-        description: 'Failed to fetch project details. Please try again.',
+        description: err.message || 'Failed to fetch project details',
         variant: 'destructive',
       });
     } finally {
@@ -46,118 +54,77 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const toggleNotifications = async () => {
-    try {
-      if (isSubscribed) {
-        await api.unsubscribeFromProject(id);
-        setIsSubscribed(false);
-        toast({
-          title: 'Notifications Disabled',
-          description: 'You will no longer receive notifications for this project.',
-        });
-      } else {
-        await api.subscribeToProject(id);
-        setIsSubscribed(true);
-        toast({
-          title: 'Notifications Enabled',
-          description: 'You will now receive notifications for this project.',
-        });
-      }
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update notification preferences.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-8">
+      <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-          <Skeleton className="h-10 w-32" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-10 w-24" />
         </div>
-        <Skeleton className="h-[600px] w-full" />
+        <div className="space-y-4">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !project) {
     return (
-      <div className="container mx-auto p-6 text-center">
-        <p className="text-red-500 mb-4">{error}</p>
-        <Button onClick={fetchProjectDetails}>Retry</Button>
+      <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+        <p className="text-lg text-muted-foreground">{error || 'Project not found'}</p>
+        <Button onClick={() => router.push('/projects')} variant="outline">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Projects
+        </Button>
       </div>
     );
   }
-
-  if (!project) return null;
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-4">
-            <Link href="/project">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <h1 className="text-3xl font-bold">{project.name}</h1>
-          </div>
-          <p className="text-muted-foreground">{project.description}</p>
+        <div>
+          <Link href="/projects" className="text-sm text-muted-foreground hover:underline">
+            <ArrowLeft className="inline-block mr-2 h-4 w-4" />
+            Back to Projects
+          </Link>
+          <h1 className="text-3xl font-bold mt-2">{project.name}</h1>
         </div>
-        <Button
-          variant="outline"
-          onClick={toggleNotifications}
-          className="flex items-center gap-2"
-        >
-          {isSubscribed ? (
-            <>
-              <BellOff className="h-4 w-4" />
-              Disable Notifications
-            </>
-          ) : (
-            <>
-              <Bell className="h-4 w-4" />
-              Enable Notifications
-            </>
-          )}
-        </Button>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview">
           <ProjectOverview project={project} onUpdate={fetchProjectDetails} />
         </TabsContent>
 
-        <TabsContent value="tasks" className="space-y-6">
-          <ProjectTasks projectId={id} />
+        <TabsContent value="pipeline">
+          <ProjectPipeline projectId={params.id} pipeline={project.pipeline} onPipelineUpdate={fetchProjectDetails} />
         </TabsContent>
 
-        <TabsContent value="team" className="space-y-6">
-          <ProjectTeam projectId={id} />
+        <TabsContent value="tasks">
+          <ProjectTasks projectId={params.id} />
         </TabsContent>
 
-        <TabsContent value="timeline" className="space-y-6">
-          <ProjectTimeline projectId={id} />
+        <TabsContent value="team">
+          <ProjectTeam projectId={params.id} onUpdate={fetchProjectDetails} />
         </TabsContent>
 
-        <TabsContent value="documents" className="space-y-6">
-          <ProjectDocuments projectId={id} />
+        <TabsContent value="reports">
+          <ProjectReports projectId={params.id} />
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <ProjectDocuments projectId={params.id} />
         </TabsContent>
       </Tabs>
     </div>

@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -50,7 +51,7 @@ function RootLayoutContent({ children }) {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
-        }
+    }
 
     // Don't render layout for login page
     if (isLoginPage) {
@@ -61,30 +62,32 @@ function RootLayoutContent({ children }) {
         );
     }
 
-    // Protected layout
+    // Protected layout - wrap with ProtectedRoute
     return (
-        <div className={`min-h-screen ${inter.className}`}>
+        <ProtectedRoute>
+            <div className={`min-h-screen ${inter.className}`}>
                 <div className="flex h-screen overflow-hidden">
-                <Sidebar 
-                    isOpen={isSidebarOpen} 
-                    onClose={() => setIsSidebarOpen(false)} 
-                />
+                    <Sidebar 
+                        isOpen={isSidebarOpen} 
+                        onClose={() => setIsSidebarOpen(false)} 
+                    />
                     <div 
                         className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
-                        isSidebarOpen ? 'md:ml-64' : 'ml-0'
+                            isSidebarOpen ? 'md:ml-64' : 'ml-0'
                         }`}
                     >
-                    <Header 
-                        toggleSidebar={toggleSidebar} 
-                        isSidebarOpen={isSidebarOpen}
-                    />
+                        <Header 
+                            toggleSidebar={toggleSidebar} 
+                            isSidebarOpen={isSidebarOpen}
+                        />
                         <main className="flex-1 overflow-auto bg-background p-6">
                             {children}
                         </main>
                     </div>
                 </div>
-            <Toaster />
-        </div>
+                <Toaster />
+            </div>
+        </ProtectedRoute>
     );
 }
 

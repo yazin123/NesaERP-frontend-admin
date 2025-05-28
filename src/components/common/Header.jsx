@@ -61,7 +61,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         const fetchNotifications = async () => {
             try {
                 const response = await api.getMyNotifications();
-                setNotifications(response.data.filter(n => !n.read));
+                setNotifications(response.data.notifications?.filter(n => !n.read) || []);
             } catch (error) {
                 console.error('Failed to fetch notifications:', error);
             }

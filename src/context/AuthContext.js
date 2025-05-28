@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.refreshToken();
       if (!response) {
-        return { isValid: true }; // Keep session active if refresh fails
+        return { isValid: false }; // Token is invalid
       }
       
       const { newToken, user: userData } = response;
@@ -35,10 +35,20 @@ export const AuthProvider = ({ children }) => {
         return { isValid: true, user: userData };
       }
       
-      return { isValid: true }; // Keep session if no new token
+      return { isValid: false }; // No new token means invalid
     } catch (error) {
       console.error('Token validation error:', error);
-      return { isValid: true }; // Keep session on error
+      return { isValid: false }; // Error means invalid
+    }
+  };
+
+  // Function to check if token is expired
+  const isTokenExpired = (token) => {
+    try {
+      const decoded = JSON.parse(atob(token.split('.')[1]));
+      return decoded.exp * 1000 < Date.now();
+    } catch (error) {
+      return true; // If we can't decode the token, consider it expired
     }
   };
 
@@ -63,6 +73,12 @@ export const AuthProvider = ({ children }) => {
         const storedUser = localStorage.getItem('user');
         
         if (token && storedUser) {
+          // Check if token is expired
+          if (isTokenExpired(token)) {
+            await logout();
+            return;
+          }
+          
           setIsAuthenticated(true);
           setUser(JSON.parse(storedUser));
           // Refresh user data in background
@@ -70,6 +86,7 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Auth status check error:', error);
+        await logout();
       } finally {
         setLoading(false);
       }
@@ -86,7 +103,7 @@ export const AuthProvider = ({ children }) => {
       // Refresh token every 14 minutes (assuming 15-minute token expiry)
       refreshInterval = setInterval(async () => {
         const token = localStorage.getItem('authToken');
-        if (!token) {
+        if (!token || isTokenExpired(token)) {
           await logout();
           return;
         }
@@ -131,7 +148,10 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await api.logout();
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        await api.logout();
+      }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -139,7 +159,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('user');
       setIsAuthenticated(false);
       setUser(null);
-      router.push('/');
+      router.replace('/');
     }
   };
 

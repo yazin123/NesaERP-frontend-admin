@@ -693,12 +693,14 @@ const EmployeeDetails = ({ employeeId }) => {
                                             </p>
                                         </div>
                                     </div>
-                                    <Button variant="outline" size="sm" asChild>
-                                        <Link href={data.resume.fileUrl} target="_blank">
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download
-                                        </Link>
-                                    </Button>
+                                    {data.resume.fileUrl && (
+                                        <Button variant="outline" size="sm" asChild>
+                                            <Link href={`/api/uploads/${data.resume.fileUrl}`} target="_blank">
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Download
+                                            </Link>
+                                        </Button>
+                                    )}
                                 </div>
                             )}
 

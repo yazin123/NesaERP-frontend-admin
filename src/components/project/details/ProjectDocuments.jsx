@@ -63,9 +63,12 @@ export function ProjectDocuments({ projectId }) {
   const fetchDocuments = async () => {
     try {
       setIsLoading(true);
-      const response = await api.getProjectDocuments(projectId);
-      setDocuments(response.data);
+      const response = await api.admin.getProjectDocuments(projectId);
+      if (response?.data?.data) {
+        setDocuments(response.data.data);
+      }
     } catch (err) {
+      console.error('Error fetching documents:', err);
       toast({
         title: 'Error',
         description: 'Failed to fetch documents. Please try again.',
@@ -94,7 +97,14 @@ export function ProjectDocuments({ projectId }) {
       formData.append('category', uploadData.category);
       formData.append('description', uploadData.description);
 
-      await ProjectService.uploadDocuments(projectId, formData);
+      await api.admin.uploadProjectDocument(projectId, {
+        files: uploadData.files,
+        metadata: {
+          category: uploadData.category,
+          description: uploadData.description
+        }
+      });
+      
       toast({
         title: 'Success',
         description: 'Documents uploaded successfully',
@@ -107,6 +117,7 @@ export function ProjectDocuments({ projectId }) {
         description: '',
       });
     } catch (err) {
+      console.error('Error uploading documents:', err);
       toast({
         title: 'Error',
         description: 'Failed to upload documents. Please try again.',
@@ -117,7 +128,7 @@ export function ProjectDocuments({ projectId }) {
 
   const handleDownload = async (documentId, fileName) => {
     try {
-      const response = await ProjectService.downloadDocument(projectId, documentId);
+      const response = await api.admin.downloadProjectDocument(projectId, documentId);
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -125,7 +136,9 @@ export function ProjectDocuments({ projectId }) {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
+      console.error('Error downloading document:', err);
       toast({
         title: 'Error',
         description: 'Failed to download document. Please try again.',
@@ -136,13 +149,14 @@ export function ProjectDocuments({ projectId }) {
 
   const handleDelete = async (documentId) => {
     try {
-      await ProjectService.deleteDocument(projectId, documentId);
+      await api.admin.deleteProjectDocument(projectId, documentId);
       toast({
         title: 'Success',
         description: 'Document deleted successfully',
       });
       fetchDocuments();
     } catch (err) {
+      console.error('Error deleting document:', err);
       toast({
         title: 'Error',
         description: 'Failed to delete document. Please try again.',
@@ -199,6 +213,26 @@ export function ProjectDocuments({ projectId }) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="relative">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="h-6 w-6 bg-muted animate-pulse rounded" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 bg-muted animate-pulse rounded" />
+                  <div className="h-4 bg-muted animate-pulse rounded w-2/3" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

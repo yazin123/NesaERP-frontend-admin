@@ -35,12 +35,13 @@ import {
 } from "@/components/ui/command";
 import api from '@/api';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from "@/lib/utils";
 
 
 const EmployeeForm = ({ employee = null }) => {
     const router = useRouter();
     const isEdit = !!employee;
-    const {toast} = useToast();
+    const { toast } = useToast();
 
     const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
         defaultValues: {
@@ -48,12 +49,16 @@ const EmployeeForm = ({ employee = null }) => {
             email: employee?.email || '',
             phone: employee?.phone || '',
             designation: employee?.designation || '',
-            role: employee?.role || '',
+            role: employee?.role || 'employee',
             department: employee?.department || '',
             position: employee?.position || '',
-            joiningDate: employee?.joiningDate ? new Date(employee.joiningDate) : null,
+            dateOfJoining: employee?.dateOfJoining ? new Date(employee.dateOfJoining) : new Date(),
             salary: employee?.salary || '',
-            bankDetails: employee?.bankDetails || '',
+            bankDetails: {
+                bankName: employee?.bankDetails?.bankName || '',
+                accountNumber: employee?.bankDetails?.accountNumber || '',
+                ifscCode: employee?.bankDetails?.ifscCode || ''
+            },
             skills: employee?.skills || [],
             status: employee?.status || 'active',
             allowedWifiNetworks: employee?.allowedWifiNetworks || [{ ssid: '', macAddress: '' }],
@@ -120,9 +125,9 @@ const EmployeeForm = ({ employee = null }) => {
 
     const fetchManagers = async () => {
         try {
-            const response = await api.admin.getManagers();
-            if (response?.data?.success) {
-                setManagers(response.data.data || []);
+            const response = await api.admin.getEmployees();
+            if (response?.data) {
+                setManagers(response.data.users || []);
             } else {
                 throw new Error('Failed to fetch managers');
             }
@@ -166,109 +171,63 @@ const EmployeeForm = ({ employee = null }) => {
         setValue('skills', currentSkills.filter(skill => skill !== skillToRemove));
     };
 
-    const onSubmit = async (data) => {
+    const onSubmit = async (formData) => {
         try {
             setLoading(true);
             setError('');
 
-            const formData = new FormData();
-            
-            // Compare with original employee data and only send changed fields
-            if (isEdit) {
-                Object.keys(data).forEach(key => {
-                    // Skip if value hasn't changed
-                    if (employee[key] === data[key]) return;
-                    
-                    if (key === 'joiningDate') {
-                        const dateValue = data[key]?.toISOString() || '';
-                        console.log(`Setting ${key}:`, dateValue);
-                        formData.append(key, dateValue);
-                    } else if (key === 'allowedWifiNetworks' || key === 'skills') {
-                        const jsonValue = JSON.stringify(data[key]);
-                        console.log(`Setting ${key}:`, jsonValue);
-                        formData.append(key, jsonValue);
-                    } else if (key === 'salary') {
-                        const numValue = Number(data[key]);
-                        console.log(`Setting ${key}:`, numValue);
-                        formData.append(key, numValue);
-                    } else {
-                        console.log(`Setting ${key}:`, data[key]);
-                        formData.append(key, data[key]);
-                    }
-                });
-            } else {
-                // For new users, send all fields
-                formData.append('type', 'employee');
-                formData.append('role', data.role || 'employee');
-                
-                Object.keys(data).forEach(key => {
-                    if (key === 'joiningDate') {
-                        const dateValue = data[key]?.toISOString() || '';
-                        console.log(`Setting ${key}:`, dateValue);
-                        formData.append(key, dateValue);
-                    } else if (key === 'allowedWifiNetworks' || key === 'skills') {
-                        const jsonValue = JSON.stringify(data[key]);
-                        console.log(`Setting ${key}:`, jsonValue);
-                        formData.append(key, jsonValue);
-                    } else if (key === 'salary') {
-                        const numValue = Number(data[key]);
-                        console.log(`Setting ${key}:`, numValue);
-                        formData.append(key, numValue);
-                    } else {
-                        console.log(`Setting ${key}:`, data[key]);
-                        formData.append(key, data[key]);
-                    }
-                });
-            }
+            console.log('Form Data:', formData); // Debug log
 
-            // Append files if present
+            // Create form data object
+            const data = new FormData();
+
+            // Append all form fields
+            Object.keys(formData).forEach(key => {
+                if (key === 'resume') {
+                    // Skip resume as it's handled separately
+                    return;
+                } else if (key === 'dateOfJoining') {
+                    data.append(key, formData[key].toISOString());
+                } else if (key === 'bankDetails') {
+                    // Handle bank details as a JSON string
+                    data.append(key, JSON.stringify(formData[key]));
+                } else if (Array.isArray(formData[key]) || typeof formData[key] === 'object') {
+                    data.append(key, JSON.stringify(formData[key]));
+                } else {
+                    data.append(key, formData[key]);
+                }
+
+                // Debug log
+                console.log(`${key}:`, formData[key]);
+            });
+
+            // Handle resume file
             if (resumeFile) {
-                console.log('Appending resume file:', resumeFile.name);
-                formData.append('resume', resumeFile);
+                data.append('resume', resumeFile);
             }
 
-            // Log the final form data being sent
-            console.log('Form Data being sent:', Object.fromEntries(formData.entries()));
+            // Make API call
+            const response = isEdit
+                ? await api.admin.updateUser(employee._id, data)
+                : await api.admin.createUser(data);
 
-            let response;
-            if (isEdit) {
-                response = await api.admin.updateUser(employee._id, formData);
-            } else {
-                response = await api.admin.createUser(formData);
-            }
-
-            if (response?.data?.success) {
+            if (response.data.success) {
                 toast({
                     title: 'Success',
                     description: `Employee ${isEdit ? 'updated' : 'created'} successfully`,
-                    variant: 'default'
                 });
                 router.push('/employees');
             } else {
-                throw new Error(response?.data?.message || 'Failed to save employee');
+                throw new Error('Failed to save employee');
             }
         } catch (error) {
-            console.error('Error submitting employee:', error.response?.data || error);
-            
-            // Handle validation errors
-            if (error.response?.data?.validationErrors) {
-                const validationErrors = error.response.data.validationErrors;
-                const errorMessages = Object.entries(validationErrors)
-                    .map(([field, error]) => `${field}: ${error.message}`)
-                    .join('\n');
-                
-                toast({
-                    title: 'Validation Error',
-                    description: errorMessages,
-                    variant: 'destructive'
-                });
-            } else {
-                toast({
-                    title: 'Error',
-                    description: error.response?.data?.message || error.message || 'Failed to save employee',
-                    variant: 'destructive'
-                });
-            }
+            console.error('Error submitting employee:', error);
+            setError(error.response?.data?.message || 'Failed to save employee');
+            toast({
+                title: 'Error',
+                description: error.response?.data?.message || 'Failed to save employee',
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }
@@ -351,10 +310,10 @@ const EmployeeForm = ({ employee = null }) => {
                     </Alert>
                 )}
 
-                    <Card>
-                        <CardContent className="p-6">
+                <Card>
+                    <CardContent className="p-6">
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Display Employee ID if editing */}
                                 {isEdit && (
                                     <div className="col-span-2">
@@ -364,28 +323,32 @@ const EmployeeForm = ({ employee = null }) => {
                                         <div className="text-lg font-semibold text-gray-700">
                                             {employee.employeeId}
                                         </div>
-                                            </div>
-                                        )}
+                                    </div>
+                                )}
 
                                 {/* Name field */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Name</label>
+                                    <label className="text-sm font-medium">Name *</label>
                                     <Controller
                                         name="name"
                                         control={control}
                                         rules={{ required: 'Name is required' }}
                                         render={({ field }) => (
-                                                <Input
-                                                    {...field}
-                                                    placeholder="Enter full name"
-                                                    error={errors.name?.message}
-                                                />
+                                            <Input
+                                                {...field}
+                                                placeholder="Enter full name"
+                                                className={errors.name ? 'border-red-500' : ''}
+                                            />
                                         )}
                                     />
+                                    {errors.name && (
+                                        <p className="text-sm text-red-500">{errors.name.message}</p>
+                                    )}
                                 </div>
 
+                                {/* Email field */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Email</label>
+                                    <label className="text-sm font-medium">Email *</label>
                                     <Controller
                                         name="email"
                                         control={control}
@@ -397,34 +360,42 @@ const EmployeeForm = ({ employee = null }) => {
                                             }
                                         }}
                                         render={({ field }) => (
-                                                <Input
-                                                    {...field}
-                                                    type="email"
-                                                    placeholder="Enter email address"
-                                                    error={errors.email?.message}
-                                                />
+                                            <Input
+                                                {...field}
+                                                type="email"
+                                                placeholder="Enter email address"
+                                                className={errors.email ? 'border-red-500' : ''}
+                                            />
                                         )}
                                     />
+                                    {errors.email && (
+                                        <p className="text-sm text-red-500">{errors.email.message}</p>
+                                    )}
                                 </div>
 
+                                {/* Phone field */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Phone</label>
+                                    <label className="text-sm font-medium">Phone *</label>
                                     <Controller
                                         name="phone"
                                         control={control}
                                         rules={{ required: 'Phone number is required' }}
                                         render={({ field }) => (
-                                                <Input
-                                                    {...field}
-                                                    placeholder="Enter phone number"
-                                                    error={errors.phone?.message}
-                                                />
+                                            <Input
+                                                {...field}
+                                                placeholder="Enter phone number"
+                                                className={errors.phone ? 'border-red-500' : ''}
+                                            />
                                         )}
                                     />
+                                    {errors.phone && (
+                                        <p className="text-sm text-red-500">{errors.phone.message}</p>
+                                    )}
                                 </div>
 
+                                {/* Designation field */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Designation</label>
+                                    <label className="text-sm font-medium">Designation *</label>
                                     <Controller
                                         name="designation"
                                         control={control}
@@ -434,7 +405,7 @@ const EmployeeForm = ({ employee = null }) => {
                                                 onValueChange={field.onChange}
                                                 value={field.value}
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger className={errors.designation ? 'border-red-500' : ''}>
                                                     <SelectValue placeholder="Select designation" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -450,10 +421,47 @@ const EmployeeForm = ({ employee = null }) => {
                                             </Select>
                                         )}
                                     />
+                                    {errors.designation && (
+                                        <p className="text-sm text-red-500">{errors.designation.message}</p>
+                                    )}
                                 </div>
 
+                                {/* Department field */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Position</label>
+                                    <label className="text-sm font-medium">Department *</label>
+                                    <Controller
+                                        name="department"
+                                        control={control}
+                                        rules={{ required: 'Department is required' }}
+                                        render={({ field }) => (
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                            >
+                                                <SelectTrigger className={errors.department ? 'border-red-500' : ''}>
+                                                    <SelectValue placeholder="Select department" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {departmentOptions.map(option => (
+                                                        <SelectItem
+                                                            key={option.value}
+                                                            value={option.value}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                    {errors.department && (
+                                        <p className="text-sm text-red-500">{errors.department.message}</p>
+                                    )}
+                                </div>
+
+                                {/* Position field */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Position *</label>
                                     <Controller
                                         name="position"
                                         control={control}
@@ -463,7 +471,7 @@ const EmployeeForm = ({ employee = null }) => {
                                                 onValueChange={field.onChange}
                                                 value={field.value}
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger className={errors.position ? 'border-red-500' : ''}>
                                                     <SelectValue placeholder="Select position" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -479,9 +487,13 @@ const EmployeeForm = ({ employee = null }) => {
                                             </Select>
                                         )}
                                     />
+                                    {errors.position && (
+                                        <p className="text-sm text-red-500">{errors.position.message}</p>
+                                    )}
                                 </div>
 
-                                            <div className="space-y-2">
+                                {/* Salary field */}
+                                <div className="space-y-2">
                                     <label className="text-sm font-medium">Salary</label>
                                     <Controller
                                         name="salary"
@@ -502,24 +514,52 @@ const EmployeeForm = ({ employee = null }) => {
                                             />
                                         )}
                                                 />
-                                            </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Bank Details</label>
-                                    <Controller
-                                        name="bankDetails"
-                                        control={control}
-                                        rules={{ required: 'Bank details are required' }}
-                                        render={({ field }) => (
-                                            <Input
-                                                {...field}
-                                                placeholder="Enter bank details"
-                                                error={errors.bankDetails?.message}
-                                            />
-                                        )}
-                                    />
                                 </div>
 
+                                {/* Bank Details field */}
+                                <div className="space-y-4">
+                                    <label className="text-sm font-medium">Bank Details</label>
+                                    <div className="space-y-2">
+                                        <Controller
+                                            name="bankDetails.bankName"
+                                            control={control}
+                                            rules={{ required: 'Bank name is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="Bank Name"
+                                                    error={errors.bankDetails?.bankName?.message}
+                                                />
+                                            )}
+                                        />
+                                        <Controller
+                                            name="bankDetails.accountNumber"
+                                            control={control}
+                                            rules={{ required: 'Account number is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="Account Number"
+                                                    error={errors.bankDetails?.accountNumber?.message}
+                                                />
+                                            )}
+                                        />
+                                        <Controller
+                                            name="bankDetails.ifscCode"
+                                            control={control}
+                                            rules={{ required: 'IFSC code is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="IFSC Code"
+                                                    error={errors.bankDetails?.ifscCode?.message}
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Role field */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Role</label>
                                     <Controller
@@ -549,63 +589,44 @@ const EmployeeForm = ({ employee = null }) => {
                                     />
                                 </div>
 
+                                {/* Date of Joining field */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Department</label>
+                                    <label className="text-sm font-medium">Date of Joining</label>
                                     <Controller
-                                        name="department"
+                                        name="dateOfJoining"
                                         control={control}
-                                        rules={{ required: 'Department is required' }}
+                                        rules={{ required: 'Date of joining is required' }}
                                         render={({ field }) => (
-                                                <Select
-                                                onValueChange={field.onChange}
-                                                    value={field.value}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select department" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {departmentOptions.map(option => (
-                                                            <SelectItem
-                                                                key={option.value}
-                                                                value={option.value}
-                                                            >
-                                                                {option.label}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant={"outline"}
+                                                        className={cn(
+                                                            "w-full justify-start text-left font-normal",
+                                                            !field.value && "text-muted-foreground"
+                                                        )}
+                                                    >
+                                                        {field.value ? (
+                                                            format(field.value, "PPP")
+                                                        ) : (
+                                                            <span>Pick a date</span>
+                                                        )}
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        selected={field.value}
+                                                        onSelect={field.onChange}
+                                                        initialFocus
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
                                         )}
                                     />
                                 </div>
 
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Joining Date</label>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button
-                                                            variant="outline"
-                                                            className="w-full justify-start text-left font-normal"
-                                                        >
-                                                {watch('joiningDate') ? (
-                                                    format(watch('joiningDate'), "PPP")
-                                                            ) : (
-                                                                <span>Pick a date</span>
-                                                            )}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0">
-                                                        <Calendar
-                                                            mode="single"
-                                                selected={watch('joiningDate')}
-                                                onSelect={(date) => {
-                                                    setValue('joiningDate', date);
-                                                }}
-                                                            initialFocus
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </div>
-
+                                {/* Status field */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Status</label>
                                     <Controller
@@ -635,6 +656,7 @@ const EmployeeForm = ({ employee = null }) => {
                                     />
                                 </div>
 
+                                {/* Reporting To field */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Reporting To</label>
                                     <Controller
@@ -662,8 +684,8 @@ const EmployeeForm = ({ employee = null }) => {
                                         )}
                                     />
                                 </div>
-                                </div>
 
+                                {/* Skills field */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Skills</label>
                                     <div className="flex items-center gap-4">
@@ -736,6 +758,7 @@ const EmployeeForm = ({ employee = null }) => {
                                     )}
                                 </div>
 
+                                {/* Resume field */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Resume</label>
                                     <div className="flex items-center gap-4">
@@ -761,6 +784,7 @@ const EmployeeForm = ({ employee = null }) => {
                                     )}
                                 </div>
 
+                                {/* Allowed WiFi Networks field */}
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <label className="text-sm font-medium">Allowed WiFi Networks</label>
@@ -812,6 +836,7 @@ const EmployeeForm = ({ employee = null }) => {
                                                 )}
                                             </div>
                                         ))}
+                                    </div>
                                 </div>
                             </div>
 
@@ -832,8 +857,8 @@ const EmployeeForm = ({ employee = null }) => {
                                 </Button>
                             </div>
                         </form>
-                        </CardContent>
-                    </Card>
+                    </CardContent>
+                </Card>
             </motion.div>
         </div>
     );
