@@ -9,9 +9,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export function ProjectStats() {
   const [stats, setStats] = useState({
+    created: 0,
     active: 0,
-    inProgress: 0,
+    onProgress: 0,
+    stopped: 0,
     completed: 0,
+    cancelled: 0,
     delayed: 0,
     total: 0,
     totalMembers: 0,
@@ -48,16 +51,28 @@ export function ProjectStats() {
 
   const mainStats = [
     {
-      title: 'Active Projects',
+      title: 'Created',
+      value: stats.created,
+      icon: Clock,
+      description: 'Newly created projects',
+    },
+    {
+      title: 'Active',
       value: stats.active,
       icon: Activity,
-      description: 'Currently active projects',
+      description: 'Projects ready to start',
     },
     {
       title: 'In Progress',
-      value: stats.inProgress,
+      value: stats.onProgress,
       icon: Clock,
-      description: 'Projects in development',
+      description: 'Projects being worked on',
+    },
+    {
+      title: 'Stopped',
+      value: stats.stopped,
+      icon: AlertCircle,
+      description: 'Projects on hold',
     },
     {
       title: 'Completed',
@@ -66,10 +81,10 @@ export function ProjectStats() {
       description: 'Successfully completed',
     },
     {
-      title: 'Delayed',
-      value: stats.delayed,
+      title: 'Cancelled',
+      value: stats.cancelled,
       icon: AlertCircle,
-      description: 'Requires attention',
+      description: 'Projects cancelled',
     },
   ];
 

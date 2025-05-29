@@ -50,8 +50,8 @@ const menuItems = [
         icon: CheckSquare,
         items: [
             { title: 'All Tasks', href: '/tasks' },
-            { title: 'Create Task', href: '/tasks/create' },
-            { title: 'Task Calendar', href: '/tasks/calendar' }
+            { title: 'My Tasks', href: '/my-tasks' },
+            
         ]
     },
     {
@@ -63,11 +63,6 @@ const menuItems = [
         title: 'Calendar',
         icon: Calendar,
         href: '/calendar'
-    },
-    {
-        title: 'Messages',
-        icon: MessageSquare,
-        href: '/messages'
     },
     {
         title: 'Settings',

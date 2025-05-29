@@ -10,11 +10,36 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/api';
 
 const COLUMNS = {
-  planning: { title: 'Planning', color: 'bg-gray-100' },
-  active: { title: 'Active', color: 'bg-blue-100' },
-  'on-hold': { title: 'On Hold', color: 'bg-yellow-100' },
-  completed: { title: 'Completed', color: 'bg-green-100' },
-  cancelled: { title: 'Cancelled', color: 'bg-red-100' }
+  created: { 
+    title: 'Created', 
+    color: 'bg-gray-100',
+    description: 'Newly created projects'
+  },
+  active: { 
+    title: 'Active', 
+    color: 'bg-blue-100',
+    description: 'Projects ready to start'
+  },
+  'on-progress': { 
+    title: 'In Progress', 
+    color: 'bg-yellow-100',
+    description: 'Projects being worked on'
+  },
+  stopped: { 
+    title: 'Stopped', 
+    color: 'bg-orange-100',
+    description: 'Projects on hold'
+  },
+  completed: { 
+    title: 'Completed', 
+    color: 'bg-green-100',
+    description: 'Successfully completed'
+  },
+  cancelled: { 
+    title: 'Cancelled', 
+    color: 'bg-red-100',
+    description: 'Projects cancelled'
+  }
 };
 
 export default function ProjectBoard() {
@@ -33,7 +58,7 @@ export default function ProjectBoard() {
       
       if (response?.data?.data?.projects) {
         const projectsByStatus = response.data.data.projects.reduce((acc, project) => {
-          const status = project.status || 'planning';
+          const status = project.status || 'created';
           if (!acc[status]) acc[status] = [];
           acc[status].push(project);
           return acc;
@@ -65,6 +90,47 @@ export default function ProjectBoard() {
     
     if (source.droppableId === destination.droppableId) return;
 
+    // Validate status transitions
+    const sourceStatus = source.droppableId;
+    const destStatus = destination.droppableId;
+    const isValidTransition = (() => {
+      switch (destStatus) {
+        case 'active':
+          // Can be activated from created, stopped, or cancelled status
+          return sourceStatus === 'created' || sourceStatus === 'stopped' || sourceStatus === 'cancelled';
+        case 'on-progress':
+          // Can only be set automatically by pipeline updates
+          return false;
+        case 'stopped':
+        case 'cancelled':
+          // Can be set from any status except completed
+          return sourceStatus !== 'completed';
+        case 'completed':
+          // Should only be set automatically when all pipeline stages are completed
+          return false;
+        case 'created':
+          // Cannot manually move to created status
+          return false;
+        default:
+          return false;
+      }
+    })();
+
+    if (!isValidTransition) {
+      toast({
+        title: 'Invalid Status Change',
+        description: sourceStatus === 'completed' 
+          ? 'Completed projects cannot be moved to another status.'
+          : destStatus === 'on-progress' || destStatus === 'completed'
+          ? 'This status is set automatically based on project pipeline progress.'
+          : destStatus === 'created'
+          ? 'Cannot manually set a project back to created status.'
+          : 'This status transition is not allowed',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       // Optimistically update the UI
       const sourceProjects = [...projects[source.droppableId]];
@@ -80,7 +146,11 @@ export default function ProjectBoard() {
       });
 
       // Update the backend
-      await api.admin.updateProjectStatus(draggableId, destination.droppableId);
+      const response = await api.admin.updateProjectStatus(draggableId, destination.droppableId);
+
+      if (!response?.data?.success) {
+        throw new Error(response?.data?.message || 'Failed to update project status');
+      }
       
       toast({
         title: 'Success',
@@ -105,9 +175,9 @@ export default function ProjectBoard() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className=" mx-auto max-w-9xl py-8">
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {Object.entries(COLUMNS).map(([status, { title, color }]) => (
             <div key={status} className="flex flex-col gap-4">
               <div className="flex items-center justify-between">

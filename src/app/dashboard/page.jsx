@@ -34,7 +34,7 @@ function DashboardPage() {
             const response = user?.role === 'admin' || user?.role === 'superadmin'
                 ? await api.admin.getDashboardStats()
                 : await api.getMyDashboardStats();
-            setStats(response.data);
+            setStats(response.data.data);
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
             setError('Failed to load dashboard statistics');
@@ -107,84 +107,79 @@ function DashboardPage() {
                 <StatCard
                     icon={Briefcase}
                     label="Total Projects"
-                    value={stats?.totalProjects || 0}
+                    value={user?.role === 'admin' || user?.role === 'superadmin' 
+                        ? stats?.projects?.total || 0 
+                        : stats?.totalProjects || 0}
                 />
                 <StatCard
                     icon={CheckSquare}
                     label="Active Tasks"
-                    value={stats?.activeTasks || 0}
+                    value={user?.role === 'admin' || user?.role === 'superadmin'
+                        ? (stats?.tasks?.byStatus?.find(s => s._id === 'active')?.count || 0)
+                        : stats?.activeTasks || 0}
                 />
                 <StatCard
                     icon={Users}
                     label="Team Members"
-                    value={stats?.teamMembers || 0}
+                    value={user?.role === 'admin' || user?.role === 'superadmin'
+                        ? stats?.users?.total || 0
+                        : stats?.teamMembers || 0}
                 />
                 <StatCard
                     icon={CheckSquare}
                     label="Completed Tasks"
-                    value={stats?.completedTasks || 0}
+                    value={user?.role === 'admin' || user?.role === 'superadmin'
+                        ? (stats?.tasks?.byStatus?.find(s => s._id === 'Completed')?.count || 0)
+                        : stats?.completedTasks || 0}
                 />
             </div>
 
-            {/* Recent Projects and Upcoming Deadlines */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent Projects */}
+            <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader>
                         <CardTitle>Recent Projects</CardTitle>
                         <CardDescription>Latest project updates</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-6">
-                            {stats?.recentProjects?.map(project => (
-                                <div key={project._id} className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <h4 className="font-medium leading-none">{project.name}</h4>
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
-                                                    {project.status}
-                                                </Badge>
-                                                <div className="flex -space-x-2">
-                                                    {project.members?.map((member, i) => (
-                                                        <Avatar key={i} className="h-6 w-6 border-2 border-background">
-                                                            <AvatarFallback>{member.name?.charAt(0)}</AvatarFallback>
-                                                        </Avatar>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
+                        <div className="space-y-4">
+                            {(user?.role === 'admin' || user?.role === 'superadmin' 
+                                ? stats?.projects?.recent 
+                                : stats?.recentProjects)?.map((project, index) => (
+                                <div key={project._id} className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-medium">{project.name}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {project.description?.substring(0, 100)}
+                                            {project.description?.length > 100 ? '...' : ''}
+                                        </p>
                                     </div>
+                                    <Badge>{project.status}</Badge>
                                 </div>
                             ))}
                         </div>
                     </CardContent>
                 </Card>
 
+                {/* Upcoming Deadlines */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Upcoming Deadlines</CardTitle>
                         <CardDescription>Tasks due in the next 7 days</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-6">
-                            {stats?.upcomingDeadlines?.map(task => (
-                                <div key={task._id} className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <h4 className="font-medium leading-none">{task.title}</h4>
-                                            <div className="flex items-center gap-2">
-                                                <Badge>{task.status}</Badge>
-                                                <span className="text-sm text-muted-foreground">
-                                                    Due {format(new Date(task.deadline), 'MMM dd, yyyy')}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Avatar>
-                                            <AvatarFallback>
-                                                {task.assignedTo?.name?.charAt(0) || 'U'}
-                                            </AvatarFallback>
-                                        </Avatar>
+                        <div className="space-y-4">
+                            {(user?.role === 'admin' || user?.role === 'superadmin' 
+                                ? stats?.tasks?.upcoming 
+                                : stats?.upcomingDeadlines)?.map((task, index) => (
+                                <div key={task._id} className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-medium">{task.description}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Due: {format(new Date(task.deadline), 'MMM dd, yyyy')}
+                                        </p>
                                     </div>
+                                    <Badge>{task.priority}</Badge>
                                 </div>
                             ))}
                         </div>

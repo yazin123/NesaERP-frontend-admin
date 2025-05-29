@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/api';
 
-export default function TasksPage() {
+export default function MyTasksPage() {
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -36,8 +36,12 @@ export default function TasksPage() {
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
-      const response = await api.admin.getTaskAll();
-      setTasks(response.data || []);
+      const response = await api.common.getMyTasks({
+        status: filters.status,
+        priority: filters.priority,
+        search: filters.search
+      });
+      setTasks(response.data.tasks || []);
     } catch (error) {
       toast({
         title: 'Error',
@@ -69,7 +73,24 @@ export default function TasksPage() {
   };
 
   const handleViewTask = (taskId) => {
-    router.push(`/tasks/${taskId}`);
+    router.push(`/my-tasks/${taskId}`);
+  };
+
+  const handleUpdateStatus = async (taskId, newStatus) => {
+    try {
+      await api.common.updateTaskStatus(taskId, { status: newStatus });
+      await fetchTasks();
+      toast({
+        title: 'Success',
+        description: 'Task status updated successfully',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update task status',
+        variant: 'destructive'
+      });
+    }
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -121,7 +142,7 @@ export default function TasksPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">All Tasks</h1>
+        <h1 className="text-3xl font-bold">My Tasks</h1>
       </div>
 
       <div className="flex gap-4 mb-6">
@@ -165,11 +186,10 @@ export default function TasksPage() {
 
       <div className="grid gap-4">
         {filteredTasks.map((task) => (
-          <Card key={task._id} className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleViewTask(task._id)}>
+          <Card key={task._id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex justify-between items-start">
-                <div className="space-y-2">
+                <div className="space-y-2 cursor-pointer" onClick={() => handleViewTask(task._id)}>
                   <CardTitle>{task.description}</CardTitle>
                   {task.project && (
                     <div className="text-sm text-muted-foreground">
@@ -188,19 +208,26 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Assigned to:</span>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={task.assignedTo?.photo} />
-                      <AvatarFallback>{task.assignedTo?.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                  </div>
+                <div className="flex flex-col items-end gap-4">
                   {task.deadline && (
                     <div className="text-sm text-muted-foreground">
                       Due: {format(new Date(task.deadline), 'PPP')}
                     </div>
                   )}
+                  <Select
+                    value={task.status}
+                    onValueChange={(value) => handleUpdateStatus(task._id, value)}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Update Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Assigned">Assigned</SelectItem>
+                      <SelectItem value="Progress">In Progress</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                      <SelectItem value="Not Completed">Not Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardHeader>

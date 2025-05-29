@@ -27,7 +27,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
     startDate: new Date(),
     endDate: new Date(),
     priority: 'medium',
-    status: 'planning',
+    status: 'created',
     developmentPhases: []
   });
   const [users, setUsers] = useState([]);
@@ -89,7 +89,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
           startDate: new Date(),
           endDate: new Date(),
           priority: 'medium',
-          status: 'planning',
+          status: 'created',
           developmentPhases: []
         });
       } else {
@@ -426,7 +426,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }) {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="planning">Planning</SelectItem>
+                    <SelectItem value="created">created</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="on-hold">On Hold</SelectItem>
                   </SelectContent>

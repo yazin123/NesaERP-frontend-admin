@@ -2,46 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Calendar, Plus, X, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { format } from 'date-fns';
+import { ProjectTaskAssignment } from './ProjectTaskAssignment';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/api';
 
 export function ProjectTasks({ projectId }) {
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [members, setMembers] = useState([]);
   const { toast } = useToast();
-
-  // New task form state
-  const [newTask, setNewTask] = useState({
-    title: '',
-    description: '',
-    assignedTo: '',
-    dueDate: '',
-    priority: 'medium',
-    status: 'pending'
-  });
 
   useEffect(() => {
     fetchTasks();
@@ -51,9 +23,11 @@ export function ProjectTasks({ projectId }) {
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
-      const response = await api.admin.getProjectTasks(projectId);
-      setTasks(response.data.data || []);
+      const tasks = await api.getProjectTasks(projectId);
+      console.log('Project tasks:', tasks);
+      setTasks(tasks || []);
     } catch (err) {
+      console.error('Error fetching tasks:', err);
       toast({
         title: 'Error',
         description: 'Failed to fetch tasks. Please try again.',
@@ -67,220 +41,104 @@ export function ProjectTasks({ projectId }) {
   const fetchMembers = async () => {
     try {
       const response = await api.admin.getProjectMembers(projectId);
-      setMembers(response.data.users || []);
+      setMembers(response.data.data || []);
     } catch (err) {
       console.error('Failed to fetch team members:', err);
-    }
-  };
-
-  const handleAddTask = async (e) => {
-    e.preventDefault();
-    try {
-      await api.admin.createProjectTask(projectId, newTask);
-      toast({
-        title: 'Success',
-        description: 'Task added successfully',
-      });
-      setIsAddTaskOpen(false);
-      fetchTasks();
-      setNewTask({
-        title: '',
-        description: '',
-        assignedTo: '',
-        dueDate: '',
-        priority: 'medium',
-        status: 'pending'
-      });
-    } catch (err) {
       toast({
         title: 'Error',
-        description: 'Failed to add task. Please try again.',
-        variant: 'destructive',
+        description: 'Failed to fetch team members',
+        variant: 'destructive'
       });
     }
   };
 
-  const handleUpdateTaskStatus = async (taskId, newStatus) => {
-    try {
-      await api.admin.updateProjectTask(projectId, taskId, { status: newStatus });
-      toast({
-        title: 'Success',
-        description: 'Task status updated successfully',
-      });
-      fetchTasks();
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update task status. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const getStatusIcon = (status) => {
+  const getStatusColor = (status) => {
     switch (status) {
-      case 'completed': return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'in-progress': return <Clock className="h-4 w-4 text-blue-600" />;
-      case 'blocked': return <AlertCircle className="h-4 w-4 text-red-600" />;
-      default: return <Clock className="h-4 w-4 text-gray-600" />;
+      case 'Completed': return 'bg-green-100 text-green-800';
+      case 'Progress': return 'bg-blue-100 text-blue-800';
+      case 'Not Completed': return 'bg-red-100 text-red-800';
+      case 'Missed': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getPriorityBadge = (priority) => {
+  const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high': return <Badge variant="destructive">High</Badge>;
-      case 'medium': return <Badge variant="secondary">Medium</Badge>;
-      case 'low': return <Badge variant="outline">Low</Badge>;
-      default: return <Badge variant="outline">{priority}</Badge>;
+      case 'High': return 'bg-red-100 text-red-800';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800';
+      case 'Low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   if (isLoading) {
-    return <div>Loading tasks...</div>;
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="h-24 bg-gray-100" />
+            <CardContent className="space-y-4">
+              <div className="h-4 bg-gray-100 rounded w-3/4" />
+              <div className="h-4 bg-gray-100 rounded w-1/2" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Tasks</h2>
-        <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Task</DialogTitle>
-              <DialogDescription>
-                Create a new task for this project.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleAddTask} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="title" className="text-sm font-medium">Title</label>
-                <Input
-                  id="title"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="description" className="text-sm font-medium">Description</label>
-                <Input
-                  id="description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="assignedTo" className="text-sm font-medium">Assign To</label>
-                <Select
-                  value={newTask.assignedTo}
-                  onValueChange={(value) => setNewTask({ ...newTask, assignedTo: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select team member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map((member) => (
-                      <SelectItem key={member._id} value={member._id}>
-                        {member.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="dueDate" className="text-sm font-medium">Due Date</label>
-                <Input
-                  id="dueDate"
-                  type="date"
-                  value={newTask.dueDate}
-                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="priority" className="text-sm font-medium">Priority</label>
-                <Select
-                  value={newTask.priority}
-                  onValueChange={(value) => setNewTask({ ...newTask, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter>
-                <Button type="submit">Create Task</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <ProjectTaskAssignment projectId={projectId} members={members} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="space-y-4">
         {tasks.map((task) => (
           <Card key={task._id}>
-            <CardHeader className="flex flex-row items-start justify-between space-y-0">
-              <div>
-                <CardTitle className="text-base">{task.title}</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-              </div>
-              {getPriorityBadge(task.priority)}
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Avatar>
-                    <AvatarImage src={task.assignedTo?.photo} />
-                    <AvatarFallback>
-                      {task.assignedTo?.name?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">{task.assignedTo?.name}</p>
-                    <p className="text-sm text-muted-foreground">Assigned To</p>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div className="space-y-2">
+                  <CardTitle>{task.description}</CardTitle>
+                  <div className="flex gap-2">
+                    <Badge className={getStatusColor(task.status)}>
+                      {task.status}
+                    </Badge>
+                    <Badge className={getPriorityColor(task.priority)}>
+                      {task.priority}
+                    </Badge>
+                    {task.isDaily && (
+                      <Badge variant="outline">Daily</Badge>
+                    )}
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    Due: {new Date(task.dueDate).toLocaleDateString()}
-                  </span>
+                <Avatar>
+                  <AvatarImage src={task.assignedTo?.photo} />
+                  <AvatarFallback>{task.assignedTo?.name?.charAt(0)}</AvatarFallback>
+                </Avatar>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <div>
+                  Assigned to: {task.assignedTo?.name}
                 </div>
-
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(task.status)}
-                  <Select
-                    value={task.status}
-                    onValueChange={(value) => handleUpdateTaskStatus(task._id, value)}
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="blocked">Blocked</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {task.deadline && (
+                  <div>
+                    Due: {format(new Date(task.deadline), 'PPP')}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         ))}
+
+        {tasks.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            No tasks found for this project.
+          </div>
+        )}
       </div>
     </div>
   );

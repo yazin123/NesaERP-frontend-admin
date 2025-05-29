@@ -63,16 +63,20 @@ export function ProjectPipeline({ projectId, pipeline, onPipelineUpdate }) {
   const handleStatusChange = async (stage, newStatus) => {
     try {
       setLoading(true);
-      await api.admin.updateProjectPipeline(projectId, {
+      const response = await api.admin.updateProjectPipeline(projectId, {
         stage,
         status: newStatus
       });
-      
-      onPipelineUpdate();
-      toast({
-        title: 'Success',
-        description: 'Pipeline status updated successfully'
-      });
+
+      if (response?.data?.success) {
+        onPipelineUpdate();
+        toast({
+          title: 'Success',
+          description: 'Pipeline status updated successfully'
+        });
+      } else {
+        throw new Error(response?.data?.message || 'Failed to update pipeline status');
+      }
     } catch (error) {
       console.error('Error updating pipeline status:', error);
       toast({
@@ -98,7 +102,7 @@ export function ProjectPipeline({ projectId, pipeline, onPipelineUpdate }) {
 
     try {
       setLoading(true);
-      await api.admin.updateProjectPipeline(projectId, {
+      const response = await api.admin.updateProjectPipeline(projectId, {
         stage: 'developmentPhase',
         phaseName: newPhase.name,
         status: 'pending',
@@ -106,13 +110,17 @@ export function ProjectPipeline({ projectId, pipeline, onPipelineUpdate }) {
         endDate: newPhase.endDate
       });
 
-      setNewPhase({ name: '', startDate: '', endDate: '' });
-      setIsAddPhaseOpen(false);
-      onPipelineUpdate();
-      toast({
-        title: 'Success',
-        description: 'Development phase added successfully'
-      });
+      if (response?.data?.success) {
+        setNewPhase({ name: '', startDate: '', endDate: '' });
+        setIsAddPhaseOpen(false);
+        onPipelineUpdate();
+        toast({
+          title: 'Success',
+          description: 'Development phase added successfully'
+        });
+      } else {
+        throw new Error(response?.data?.message || 'Failed to add development phase');
+      }
     } catch (error) {
       console.error('Error adding development phase:', error);
       toast({

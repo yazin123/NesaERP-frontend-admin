@@ -103,19 +103,9 @@ const common = {
   login: (credentials) => api.post('/users/login', credentials),
   logout: () => api.post('/users/logout'),
   getCurrentUser: () => api.get('/users/current'),
-  changePassword: (userId, data) => api.put(`/users/${userId}/change-password`, data),
+  changePassword: (data) => api.put('/user/profile/password', data),
   updateProfile: (data) => {
-    const formData = new FormData();
-    Object.keys(data).forEach(key => {
-      if (key === 'photo') {
-        if (data[key]) formData.append(key, data[key]);
-      } else {
-        formData.append(key, data[key]);
-      }
-    });
-    return api.put('/users/profile', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    return api.put('/user/profile', data);
   },
 
   // Dashboard
@@ -130,14 +120,15 @@ const common = {
   updateNotificationPreferences: (preferences) => api.put('/notifications/preferences', preferences),
 
   // Personal tasks
-  getMyTasks: (params) => api.get('/tasks/my-tasks', { params }),
-  getTaskById: (id) => api.get(`/tasks/${id}`),
-  updateTaskStatus: (id, status) => api.patch(`/tasks/${id}/status`, { status }),
-  addTaskComment: (id, comment) => api.post(`/tasks/${id}/comments`, { comment }),
+  getMyTasks: () => api.get('/tasks/my-tasks'),
+  getTaskDetails: (taskId) => api.get(`/tasks/${taskId}`),
+  updateTask: (taskId, data) => api.put(`/tasks/${taskId}`, data),
+  createTask: (data) => api.post('/tasks', data),
+  deleteTask: (taskId) => api.delete(`/tasks/${taskId}`),
 
   // Personal projects
-  getMyProjects: (params) => api.get('/projects/my-projects', { params }),
-  getProjectById: (id) => api.get(`/projects/${id}`),
+  getMyProjects: () => api.get('/projects/my-projects'),
+  getProjectDetails: (projectId) => api.get(`/projects/${projectId}`),
   subscribeToProject: (projectId) => api.post(`/notifications/subscribe/project/${projectId}`),
   unsubscribeFromProject: (projectId) => api.delete(`/notifications/subscribe/project/${projectId}`),
 
@@ -149,6 +140,70 @@ const common = {
   getDailyReports: (params) => api.get('/daily-reports', { params }),
   updateDailyReport: (reportId, data) => api.put(`/daily-reports/${reportId}`, data),
   deleteDailyReport: (reportId) => api.delete(`/daily-reports/${reportId}`),
+
+  // Project tasks
+  getProjectTasks: (projectId) => api.get(`/projects/${projectId}/tasks`).then(response => response.data),
+  createProjectTask: (projectId, task) => api.post(`/projects/${projectId}/tasks`, task),
+  updateProjectTask: (projectId, taskId, task) => api.put(`/projects/${projectId}/tasks/${taskId}`, task),
+  deleteProjectTask: (projectId, taskId) => api.delete(`/projects/${projectId}/tasks/${taskId}`),
+  assignProjectTasks: (projectId, data) => api.post(`/projects/${projectId}/assign-tasks`, data),
+
+  // Team members by tech stack
+  getTeamMembersByTechStack: () => api.get('/admin/projects/team-members/tech-stack'),
+
+  // Performance management
+  getUserPerformance: (userId) => api.get(`/admin/performance/${userId}`),
+  updatePerformance: (userId, data) => api.put(`/admin/performance/${userId}`, data),
+
+  // Dashboard
+  getDashboardStats: () => api.get('/admin/dashboard'),
+
+  // System monitoring
+  getSystemMetrics: () => api.get('/admin/monitoring/detailed-metrics'),
+  getEmailQueueStatus: () => api.get('/admin/monitoring/email-queue'),
+  getSystemHealth: () => api.get('/admin/monitoring/health'),
+  clearFailedEmails: () => api.post('/admin/monitoring/email-queue/clear-failed'),
+
+  // Project Documents
+  getProjectDocuments: (projectId) => api.get(`/admin/projects/${projectId}/documents`),
+  uploadProjectDocument: (projectId, data) => {
+    const formData = new FormData();
+    if (data.files) {
+      data.files.forEach(file => formData.append('files', file));
+    }
+    if (data.metadata) {
+      formData.append('metadata', JSON.stringify(data.metadata));
+    }
+    return api.post(`/admin/projects/${projectId}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteProjectDocument: (projectId, documentId) => api.delete(`/admin/projects/${projectId}/documents/${documentId}`),
+
+  // Project reports
+  getProjectReports: (projectId, params) => api.get('/daily-reports', { params: { projectId, ...params } }),
+  createProjectReport: (data) => api.post(`/admin/projects/${data.projectId}/reports`, data),
+  updateProjectReport: (projectId, reportId, data) => api.put(`/admin/projects/${projectId}/reports/${reportId}`, data),
+  deleteProjectReport: (projectId, reportId) => api.delete(`/admin/projects/${projectId}/reports/${reportId}`),
+
+  // Tasks
+  getTaskAll: () => api.get('/admin/tasks'),
+  getTaskById: (taskId) => api.get(`/admin/tasks/${taskId}`),
+  updateTask: (taskId, data) => api.put(`/admin/tasks/${taskId}`, data),
+  deleteTask: (taskId) => api.delete(`/admin/tasks/${taskId}`),
+
+  user: {
+    updatePhoto: (formData) => {
+      return api.put('/user/profile/photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+    }
+  },
+
+  // Projects
+  getProjectTimeline: (projectId) => api.get(`/projects/${projectId}/timeline`),
 };
 
 // Admin-only endpoints
@@ -158,7 +213,7 @@ const admin = {
   getManagers: () => api.get('/admin/users/managers'),
   getUserById: (id) => api.get(`/admin/users/${id}`),
 
-  createUser: ( data) => {
+  createUser: (data) => {
     const formData = new FormData();
     
     // If data is already FormData, use it directly
@@ -172,14 +227,21 @@ const admin = {
     Object.keys(data).forEach(key => {
       if (key === 'photo' || key === 'resume') {
         if (data[key]) formData.append(key, data[key]);
-      } else if (typeof data[key] === 'object') {
+      } else if (key === 'bankDetails') {
+        // Handle bankDetails specifically
+        const bankDetails = typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]);
+        formData.append(key, bankDetails);
+      } else if (Array.isArray(data[key])) {
+        // Handle arrays (skills, allowedWifiNetworks, etc.)
+        formData.append(key, JSON.stringify(data[key]));
+      } else if (typeof data[key] === 'object' && data[key] !== null) {
         formData.append(key, JSON.stringify(data[key]));
       } else {
         formData.append(key, data[key]);
       }
     });
 
-    return api.put(`/admin/users`, formData, {
+    return api.post(`/admin/users`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
@@ -259,7 +321,11 @@ const admin = {
     });
   },
   deleteProject: (id) => api.delete(`/admin/projects/${id}`),
-  updateProjectStatus: (id, status, reason) => api.patch(`/admin/projects/${id}/status`, { status, reason }),
+  updateProjectStatus: (id, status, reason) => {
+    // Handle both object and direct status value
+    const data = typeof status === 'object' ? status : { status, reason };
+    return api.patch(`/admin/projects/${id}/status`, data);
+  },
   updateProjectPipeline: (id, data) => api.patch(`/admin/projects/${id}/pipeline`, data),
   
   // Project team
@@ -273,12 +339,6 @@ const admin = {
   addTimelineEvent: (id, event) => api.post(`/admin/projects/${id}/timeline`, event),
   updateTimelineEvent: (projectId, eventId, event) => api.put(`/admin/projects/${projectId}/timeline/${eventId}`, event),
   deleteTimelineEvent: (projectId, eventId) => api.delete(`/admin/projects/${projectId}/timeline/${eventId}`),
-  
-  // Project tasks
-  getProjectTasks: (id) => api.get(`/admin/projects/${id}/tasks`),
-  createProjectTask: (id, task) => api.post(`/admin/projects/${id}/tasks`, task),
-  updateProjectTask: (projectId, taskId, task) => api.put(`/admin/projects/${projectId}/tasks/${taskId}`, task),
-  deleteProjectTask: (projectId, taskId) => api.delete(`/admin/projects/${projectId}/tasks/${taskId}`),
   
   // Team members by tech stack
   getTeamMembersByTechStack: () => api.get('/admin/projects/team-members/tech-stack'),
@@ -317,6 +377,19 @@ const admin = {
   createProjectReport: (data) => api.post(`/admin/projects/${data.projectId}/reports`, data),
   updateProjectReport: (projectId, reportId, data) => api.put(`/admin/projects/${projectId}/reports/${reportId}`, data),
   deleteProjectReport: (projectId, reportId) => api.delete(`/admin/projects/${projectId}/reports/${reportId}`),
+
+  // Tasks
+  getTaskAll: () => api.get('/admin/tasks'),
+  getTaskById: (taskId) => api.get(`/admin/tasks/${taskId}`),
+  updateTask: (taskId, data) => api.put(`/admin/tasks/${taskId}`, data),
+  deleteTask: (taskId) => api.delete(`/admin/tasks/${taskId}`),
+
+  // Timeline Events
+  getProjectEvents: (projectId, params) => api.get(`/timeline/projects/${projectId}/timeline`, { params }),
+  addTimelineEvent: (projectId, data) => api.post(`/timeline/projects/${projectId}/timeline`, data),
+  updateTimelineEvent: (projectId, eventId, data) => api.put(`/timeline/projects/${projectId}/timeline/${eventId}`, data),
+  deleteTimelineEvent: (projectId, eventId) => api.delete(`/timeline/projects/${projectId}/timeline/${eventId}`),
+  getAllEvents: (params) => api.get('/timeline/events', { params }),
 };
 
 // Create the final API object with proper type checking
