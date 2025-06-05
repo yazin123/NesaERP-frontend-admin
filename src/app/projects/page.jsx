@@ -35,24 +35,46 @@ export default function Projects() {
     try {
       setLoading(true);
       const [projectsRes, departmentsRes] = await Promise.all([
-        projectsApi.getAllProjects(),
+        projectsApi.getAllProjects({
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          department: departmentFilter !== 'all' ? departmentFilter : undefined,
+          search: searchTerm || undefined
+        }),
         organizationApi.getAllDepartments()
       ]);
 
-      if (projectsRes.data) {
+      // Handle projects response
+      if (projectsRes?.data?.data?.projects) {
+        setProjects(projectsRes.data.data.projects);
+      } else if (Array.isArray(projectsRes?.data?.data)) {
+        setProjects(projectsRes.data.data);
+      } else if (Array.isArray(projectsRes?.data)) {
         setProjects(projectsRes.data);
+      } else {
+        setProjects([]);
+        console.warn('Unexpected projects response format:', projectsRes);
       }
 
-      if (departmentsRes.data) {
+      // Handle departments response
+      if (departmentsRes?.data?.data?.departments) {
+        setDepartments(departmentsRes.data.data.departments);
+      } else if (Array.isArray(departmentsRes?.data?.data)) {
+        setDepartments(departmentsRes.data.data);
+      } else if (Array.isArray(departmentsRes?.data)) {
         setDepartments(departmentsRes.data);
+      } else {
+        setDepartments([]);
+        console.warn('Unexpected departments response format:', departmentsRes);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch data. Please try again later.',
+        description: error.response?.data?.message || 'Failed to fetch data. Please try again later.',
         variant: 'destructive',
       });
+      setProjects([]);
+      setDepartments([]);
     } finally {
       setLoading(false);
     }
@@ -71,14 +93,15 @@ export default function Projects() {
     return colors[status] || 'bg-gray-500';
   };
 
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredProjects = Array.isArray(projects) ? projects.filter(project => {
+    if (!project) return false;
+    const matchesSearch = (project.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (project.description?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
-    const matchesDepartment = departmentFilter === 'all' || project.department._id === departmentFilter;
+    const matchesDepartment = departmentFilter === 'all' || project.department?._id === departmentFilter;
     
     return matchesSearch && matchesStatus && matchesDepartment;
-  });
+  }) : [];
 
   if (loading) {
     return (
@@ -128,7 +151,7 @@ export default function Projects() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
+                {Array.isArray(departments) && departments.map((dept) => (
                   <SelectItem key={dept._id} value={dept._id}>
                     {dept.name}
                   </SelectItem>

@@ -1,55 +1,11 @@
 import api from './config';
 
-export const usersApi = {
+const usersApi = {
   // User management
-  getAllUsers: (params) => api.get('/admin/users', { params }),
-  getManagers: () => api.get('/admin/users/managers'),
+  getUsers: (params) => api.get('/admin/users', { params }),
   getUserById: (id) => api.get(`/admin/users/${id}`),
-
   createUser: (data) => {
     const formData = new FormData();
-    
-    // If data is already FormData, use it directly
-    if (data instanceof FormData) {
-      return api.post(`/admin/users`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-    }
-
-    // Convert data to FormData
-    Object.keys(data).forEach(key => {
-      if (key === 'photo' || key === 'resume') {
-        if (data[key]) formData.append(key, data[key]);
-      } else if (key === 'bankDetails') {
-        // Handle bankDetails specifically
-        const bankDetails = typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]);
-        formData.append(key, bankDetails);
-      } else if (Array.isArray(data[key])) {
-        // Handle arrays (skills, allowedWifiNetworks, etc.)
-        formData.append(key, JSON.stringify(data[key]));
-      } else if (typeof data[key] === 'object' && data[key] !== null) {
-        formData.append(key, JSON.stringify(data[key]));
-      } else {
-        formData.append(key, data[key]);
-      }
-    });
-
-    return api.post(`/admin/users`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-  },
-
-  updateUser: (id, data) => {
-    const formData = new FormData();
-    
-    // If data is already FormData, use it directly
-    if (data instanceof FormData) {
-      return api.put(`/admin/users/update/${id}`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-    }
-
-    // Convert data to FormData
     Object.keys(data).forEach(key => {
       if (key === 'photo' || key === 'resume') {
         if (data[key]) formData.append(key, data[key]);
@@ -59,15 +15,30 @@ export const usersApi = {
         formData.append(key, data[key]);
       }
     });
+    return api.post('/admin/users', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
 
-    return api.put(`/admin/users/update/${id}`, formData, {
+  updateUser: (id, data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'photo' || key === 'resume') {
+        if (data[key]) formData.append(key, data[key]);
+      } else if (typeof data[key] === 'object') {
+        formData.append(key, JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key]);
+      }
+    });
+    return api.put(`/admin/users/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
 
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
 
-  // Employee-specific endpoints (aliases for backward compatibility)
+  // Employee-specific endpoints
   getEmployees: (params) => api.get('/admin/users', { params: { ...params, type: 'employee' } }),
   getEmployeeById: (id) => api.get(`/admin/users/${id}`),
   createEmployee: (data) => usersApi.createUser({ ...data, type: 'employee' }),
@@ -77,6 +48,26 @@ export const usersApi = {
   // User performance
   getUserPerformance: (userId) => api.get(`/admin/users/${userId}/performance`),
   updatePerformance: (userId, data) => api.put(`/admin/users/${userId}/performance`, data),
+
+  // Profile management
+  updateProfile: (data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (key === 'photo') {
+        if (data[key]) formData.append(key, data[key]);
+      } else if (typeof data[key] === 'object') {
+        formData.append(key, JSON.stringify(data[key]));
+      } else {
+        formData.append(key, data[key]);
+      }
+    });
+    return api.put('/users/profile', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Password management
+  changePassword: (data) => api.put('/users/profile/password', data)
 };
 
 export default usersApi; 

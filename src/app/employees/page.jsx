@@ -42,12 +42,12 @@ export default function Employees() {
     try {
       setLoading(true);
       const [employeesResponse, departmentsResponse] = await Promise.all([
-        usersApi.getAllEmployees(),
+        usersApi.getEmployees(),
         organizationApi.getAllDepartments()
       ]);
 
-      if (employeesResponse.data && Array.isArray(employeesResponse.data)) {
-        setEmployees(employeesResponse.data);
+      if (employeesResponse.data && Array.isArray(employeesResponse.data.users)) {
+        setEmployees(employeesResponse.data.users);
       }
 
       if (departmentsResponse.data && Array.isArray(departmentsResponse.data)) {
@@ -120,7 +120,7 @@ export default function Employees() {
               <SelectItem value="all">All Departments</SelectItem>
               {departments.map((department) => (
                 <SelectItem key={department._id} value={department._id}>
-                  {department.name}
+                  {department.name} 
                 </SelectItem>
               ))}
             </SelectContent>
@@ -151,6 +151,7 @@ export default function Employees() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Id</TableHead>
               <TableHead>Employee</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Designation</TableHead>
@@ -161,6 +162,7 @@ export default function Employees() {
           <TableBody>
             {filteredEmployees.map((employee) => (
               <TableRow key={employee._id}>
+                <TableCell>{employee.employeeId}</TableCell>
                 <TableCell>
                   <div>
                     <div className="font-medium">{employee.name}</div>
@@ -169,7 +171,7 @@ export default function Employees() {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{employee.department?.name}</TableCell>
+                <TableCell>{employee.department}</TableCell>
                 <TableCell>{employee.designation}</TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(employee.status)}>

@@ -142,9 +142,9 @@ const EmployeeForm = ({ employee = null, onSuccess }) => {
 
     const fetchManagers = async () => {
         try {
-            const response = await usersApi.getEmployees();
-            if (response?.data) {
-                setManagers(response.data.users || []);
+            const response = await usersApi.getEmployees({ role: ['manager', 'admin', 'superadmin'] });
+            if (response?.data?.users) {
+                setManagers(response.data.users.filter(user => user.status === 'active'));
             } else {
                 throw new Error('Failed to fetch managers');
             }

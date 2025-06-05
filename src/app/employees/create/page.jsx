@@ -52,12 +52,24 @@ export default function CreateEmployee() {
         organizationApi.getAllDesignations()
       ]);
 
-      if (departmentsRes.data) {
+      // Ensure departments is always an array
+      if (departmentsRes?.data?.departments) {
+        setDepartments(departmentsRes.data.departments);
+      } else if (Array.isArray(departmentsRes?.data)) {
         setDepartments(departmentsRes.data);
+      } else {
+        setDepartments([]);
+        console.warn('Departments data is not in expected format:', departmentsRes?.data);
       }
 
-      if (designationsRes.data) {
+      // Ensure designations is always an array
+      if (designationsRes?.data?.designations) {
+        setDesignations(designationsRes.data.designations);
+      } else if (Array.isArray(designationsRes?.data)) {
         setDesignations(designationsRes.data);
+      } else {
+        setDesignations([]);
+        console.warn('Designations data is not in expected format:', designationsRes?.data);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -69,15 +81,33 @@ export default function CreateEmployee() {
     }
   };
 
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleNestedInputChange = (parent, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [parent]: {
+        ...prev[parent],
+        [field]: value
+      }
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
       const response = await usersApi.createEmployee(formData);
+      
       if (response.data) {
         toast({
           title: 'Success',
-          description: 'Employee created successfully!',
+          description: 'Employee created successfully',
         });
         router.push('/employees');
       }
@@ -85,7 +115,7 @@ export default function CreateEmployee() {
       console.error('Error creating employee:', error);
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create employee. Please try again.',
+        description: error.response?.data?.message || 'Failed to create employee',
         variant: 'destructive',
       });
     } finally {
@@ -93,100 +123,78 @@ export default function CreateEmployee() {
     }
   };
 
-  const handleChange = (field, value) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
-  };
-
-  const filteredDesignations = formData.department
-    ? designations.filter(d => d.department === formData.department)
-    : [];
-
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <Link href="/employees" className="text-sm text-muted-foreground hover:text-foreground">
-          <Button variant="ghost" className="pl-0">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Employees
-          </Button>
-        </Link>
+    <div className="p-6">
+      <div className="flex items-center gap-4 mb-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-2xl font-bold">Create Employee</h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create New Employee</CardTitle>
+          <CardTitle>Employee Information</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label>First Name</Label>
                 <Input
-                  id="firstName"
                   value={formData.firstName}
-                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  onChange={(e) => handleInputChange('firstName', e.target.value)}
+                  placeholder="Enter first name"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label>Last Name</Label>
                 <Input
-                  id="lastName"
                   value={formData.lastName}
-                  onChange={(e) => handleChange('lastName', e.target.value)}
+                  onChange={(e) => handleInputChange('lastName', e.target.value)}
+                  placeholder="Enter last name"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label>Email</Label>
                 <Input
-                  id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="Enter email address"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
+                <Label>Phone</Label>
                 <Input
-                  id="phone"
-                  type="tel"
                   value={formData.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  placeholder="Enter phone number"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+                <Label>Department</Label>
                 <Select
                   value={formData.department}
-                  onValueChange={(value) => handleChange('department', value)}
-                  required
+                  onValueChange={(value) => handleInputChange('department', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select Department" />
+                    <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments.map((dept) => (
+                    {Array.isArray(departments) && departments.map((dept) => (
                       <SelectItem key={dept._id} value={dept._id}>
                         {dept.name}
                       </SelectItem>
@@ -196,18 +204,16 @@ export default function CreateEmployee() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="designation">Designation</Label>
+                <Label>Designation</Label>
                 <Select
                   value={formData.designation}
-                  onValueChange={(value) => handleChange('designation', value)}
-                  required
-                  disabled={!formData.department}
+                  onValueChange={(value) => handleInputChange('designation', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select Designation" />
+                    <SelectValue placeholder="Select designation" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredDesignations.map((desig) => (
+                    {Array.isArray(designations) && designations.map((desig) => (
                       <SelectItem key={desig._id} value={desig._id}>
                         {desig.name}
                       </SelectItem>
@@ -217,24 +223,22 @@ export default function CreateEmployee() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="joinDate">Join Date</Label>
+                <Label>Join Date</Label>
                 <Input
-                  id="joinDate"
                   type="date"
                   value={formData.joinDate}
-                  onChange={(e) => handleChange('joinDate', e.target.value)}
+                  onChange={(e) => handleInputChange('joinDate', e.target.value)}
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+              <Label>Address</Label>
               <Textarea
-                id="address"
                 value={formData.address}
-                onChange={(e) => handleChange('address', e.target.value)}
-                rows={3}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                placeholder="Enter address"
                 required
               />
             </div>
@@ -243,32 +247,29 @@ export default function CreateEmployee() {
               <h3 className="text-lg font-medium">Emergency Contact</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyName">Name</Label>
+                  <Label>Name</Label>
                   <Input
-                    id="emergencyName"
                     value={formData.emergencyContact.name}
-                    onChange={(e) => handleChange('emergencyContact.name', e.target.value)}
+                    onChange={(e) => handleNestedInputChange('emergencyContact', 'name', e.target.value)}
+                    placeholder="Enter emergency contact name"
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyRelationship">Relationship</Label>
+                  <Label>Relationship</Label>
                   <Input
-                    id="emergencyRelationship"
                     value={formData.emergencyContact.relationship}
-                    onChange={(e) => handleChange('emergencyContact.relationship', e.target.value)}
+                    onChange={(e) => handleNestedInputChange('emergencyContact', 'relationship', e.target.value)}
+                    placeholder="Enter relationship"
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyPhone">Phone</Label>
+                  <Label>Phone</Label>
                   <Input
-                    id="emergencyPhone"
-                    type="tel"
                     value={formData.emergencyContact.phone}
-                    onChange={(e) => handleChange('emergencyContact.phone', e.target.value)}
+                    onChange={(e) => handleNestedInputChange('emergencyContact', 'phone', e.target.value)}
+                    placeholder="Enter emergency contact phone"
                     required
                   />
                 </div>
@@ -279,11 +280,14 @@ export default function CreateEmployee() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push('/employees')}
+                onClick={() => router.back()}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading}>
+              <Button
+                type="submit"
+                disabled={loading}
+              >
                 {loading ? 'Creating...' : 'Create Employee'}
               </Button>
             </div>

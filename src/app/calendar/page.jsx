@@ -47,7 +47,7 @@ const CalendarPage = () => {
     try {
       setIsLoading(true);
       const response = await calendarApi.getEvents();
-      setEvents(response.data.map(event => ({
+      setEvents((response.data?.data || []).map(event => ({
         ...event,
         start: new Date(event.start),
         end: new Date(event.end)
@@ -71,7 +71,7 @@ const CalendarPage = () => {
     e.preventDefault();
     try {
       const response = await calendarApi.createEvent(newEvent);
-      setEvents([...events, response.data.event]);
+      setEvents([...events, response.data.data]);
       setNewEvent({
         title: '',
         description: '',

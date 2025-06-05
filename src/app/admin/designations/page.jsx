@@ -50,20 +50,38 @@ export default function Designations() {
         organizationApi.getAllDepartments()
       ]);
 
-      if (designationsRes.data) {
+      // Handle designations response
+      if (designationsRes?.data?.data?.designations) {
+        setDesignations(designationsRes.data.data.designations);
+      } else if (Array.isArray(designationsRes?.data?.data)) {
+        setDesignations(designationsRes.data.data);
+      } else if (Array.isArray(designationsRes?.data)) {
         setDesignations(designationsRes.data);
+      } else {
+        setDesignations([]);
+        console.warn('Unexpected designations response format:', designationsRes);
       }
 
-      if (departmentsRes.data) {
+      // Handle departments response
+      if (departmentsRes?.data?.data?.departments) {
+        setDepartments(departmentsRes.data.data.departments);
+      } else if (Array.isArray(departmentsRes?.data?.data)) {
+        setDepartments(departmentsRes.data.data);
+      } else if (Array.isArray(departmentsRes?.data)) {
         setDepartments(departmentsRes.data);
+      } else {
+        setDepartments([]);
+        console.warn('Unexpected departments response format:', departmentsRes);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch data. Please try again later.',
+        description: error.response?.data?.message || 'Failed to fetch data. Please try again later.',
         variant: 'destructive',
       });
+      setDesignations([]);
+      setDepartments([]);
     } finally {
       setLoading(false);
     }
@@ -81,7 +99,7 @@ export default function Designations() {
         response = await organizationApi.createDesignation(formData);
       }
 
-      if (response.data) {
+      if (response?.data?.success) {
         toast({
           title: 'Success',
           description: `Designation ${editingDesignation ? 'updated' : 'created'} successfully`,
@@ -93,7 +111,7 @@ export default function Designations() {
       console.error('Error saving designation:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save designation',
+        description: error.response?.data?.message || 'Failed to save designation',
         variant: 'destructive',
       });
     } finally {
@@ -104,17 +122,20 @@ export default function Designations() {
   const handleDelete = async (id) => {
     try {
       setLoading(true);
-      await organizationApi.deleteDesignation(id);
-      toast({
-        title: 'Success',
-        description: 'Designation deleted successfully',
-      });
-      fetchData();
+      const response = await organizationApi.deleteDesignation(id);
+      
+      if (response?.data?.success) {
+        toast({
+          title: 'Success',
+          description: 'Designation deleted successfully',
+        });
+        fetchData();
+      }
     } catch (error) {
       console.error('Error deleting designation:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete designation',
+        description: error.response?.data?.message || 'Failed to delete designation',
         variant: 'destructive',
       });
     } finally {
@@ -123,12 +144,14 @@ export default function Designations() {
   };
 
   const handleEdit = (designation) => {
+    if (!designation) return;
+    
     setEditingDesignation(designation);
     setFormData({
-      name: designation.name,
-      description: designation.description,
-      department: designation.department._id,
-      level: designation.level
+      name: designation.name || '',
+      description: designation.description || '',
+      department: designation.department?._id || '',
+      level: designation.level || 1
     });
     setIsDialogOpen(true);
   };
@@ -145,26 +168,43 @@ export default function Designations() {
   };
 
   const levels = ['Junior', 'Mid', 'Senior', 'Lead', 'Manager', 'Director'];
-  const departmentOptions = departments.map((dept) => ({
+  const departmentOptions = Array.isArray(departments) ? departments.map((dept) => ({
     value: dept._id,
     label: dept.name
-  }));
+  })) : [];
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Designations</h1>
         
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={handleAdd}>
               <Plus className="h-4 w-4 mr-2" />
               Add Designation
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Designation</DialogTitle>
+              <DialogTitle>
+                {editingDesignation ? 'Edit Designation' : 'Create Designation'}
+              </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -208,8 +248,8 @@ export default function Designations() {
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
                   <SelectContent>
-                    {levels.map((level) => (
-                      <SelectItem key={level} value={level}>
+                    {levels.map((level, index) => (
+                      <SelectItem key={index} value={(index + 1).toString()}>
                         {level}
                       </SelectItem>
                     ))}
@@ -227,20 +267,35 @@ export default function Designations() {
                 />
               </div>
 
-              <Button type="submit" className="w-full">Create Designation</Button>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {editingDesignation ? 'Update' : 'Create'}
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {designations.map((designation) => (
-          <Card key={designation._id}>
+        {Array.isArray(designations) && designations.map((designation) => (
+          <Card key={designation._id} className="relative">
             <CardHeader>
               <CardTitle className="flex justify-between items-center">
                 <span>{designation.name}</span>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(designation)}>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEdit(designation)}
+                  >
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
@@ -254,15 +309,16 @@ export default function Designations() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 mb-2">
-                <Building2 className="h-4 w-4" />
-                <span className="text-sm">{designation.department.name}</span>
-                <span className="text-sm text-muted-foreground">• {levels[designation.level - 1]}</span>
+              <div className="space-y-2">
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  <span>{designation.department?.name || 'No Department'}</span>
+                </div>
+                <p className="text-sm">{designation.description}</p>
+                <div className="text-sm text-muted-foreground">
+                  Level: {levels[designation.level - 1] || designation.level}
+                </div>
               </div>
-              
-              <p className="text-sm text-muted-foreground mb-4">
-                {designation.description}
-              </p>
             </CardContent>
           </Card>
         ))}

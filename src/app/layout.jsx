@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { AdminNav } from '@/components/AdminNav';
+import { AdminQuickMenu } from '@/components/AdminQuickMenu';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -82,7 +82,7 @@ function RootLayoutContent({ children }) {
                             isSidebarOpen={isSidebarOpen}
                         >
                             <div className="ml-auto">
-                                <AdminNav />
+                                <AdminQuickMenu />
                             </div>
                         </Header>
                         <main className="flex-1 overflow-auto bg-background p-6">

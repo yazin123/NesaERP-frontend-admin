@@ -80,71 +80,71 @@ export const NotificationService = {
       console.error('Failed to update notification preferences:', error);
       throw error;
     }
+  },
+
+  setNotificationCallback: (callback) => {
+    notificationCallback = callback;
+  },
+
+  initializeWebSocket: () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.warn('No auth token found for WebSocket connection');
+      return;
+    }
+
+    try {
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:5000';
+      ws = new WebSocket(`${wsUrl}/notifications?token=${token}`);
+
+      ws.onopen = () => {
+        console.log('WebSocket connection established');
+        reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const notification = JSON.parse(event.data);
+          handleNotification(notification);
+          // Call the callback to update the notification list
+          if (notificationCallback) {
+            notificationCallback(notification);
+          }
+        } catch (error) {
+          console.error('Failed to parse notification:', error);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket connection closed');
+        handleReconnection();
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        if (ws.readyState === WebSocket.CLOSED) {
+          handleReconnection();
+        }
+      };
+    } catch (error) {
+      console.error('Failed to initialize WebSocket:', error);
+      handleReconnection();
+    }
   }
 };
 
-// WebSocket connection for real-time notifications
+// WebSocket connection variables
 let ws = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 5000;
 let notificationCallback = null;
 
-export const setNotificationCallback = (callback) => {
-  notificationCallback = callback;
-};
-
-export const initializeWebSocket = () => {
-  const token = localStorage.getItem('authToken');
-  if (!token) {
-    console.warn('No auth token found for WebSocket connection');
-    return;
-  }
-
-  try {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
-    ws = new WebSocket(`${wsUrl}/notifications?token=${token}`);
-
-    ws.onopen = () => {
-      console.log('WebSocket connection established');
-      reconnectAttempts = 0; // Reset reconnect attempts on successful connection
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const notification = JSON.parse(event.data);
-        handleNotification(notification);
-        // Call the callback to update the notification list
-        if (notificationCallback) {
-          notificationCallback(notification);
-        }
-      } catch (error) {
-        console.error('Failed to parse notification:', error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      handleReconnection();
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      if (ws.readyState === WebSocket.CLOSED) {
-        handleReconnection();
-      }
-    };
-  } catch (error) {
-    console.error('Failed to initialize WebSocket:', error);
-    handleReconnection();
-  }
-};
-
 const handleReconnection = () => {
   if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
     reconnectAttempts++;
     console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-    setTimeout(initializeWebSocket, RECONNECT_DELAY);
+    setTimeout(NotificationService.initializeWebSocket, RECONNECT_DELAY);
   } else {
     console.error('Max reconnection attempts reached');
   }
@@ -208,7 +208,7 @@ const handleNotification = (notification) => {
 
 // Initialize WebSocket connection and handle reconnection
 if (typeof window !== 'undefined') {
-  initializeWebSocket();
+  NotificationService.initializeWebSocket();
 
   // Reinitialize WebSocket when token changes
   window.addEventListener('storage', (event) => {
@@ -218,7 +218,7 @@ if (typeof window !== 'undefined') {
       }
       if (event.newValue) {
         reconnectAttempts = 0; // Reset reconnect attempts
-        initializeWebSocket();
+        NotificationService.initializeWebSocket();
       }
     }
   });

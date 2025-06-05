@@ -87,7 +87,7 @@ export default function Departments() {
     setFormData({
       name: department.name,
       description: department.description,
-      head: department.head
+      head: department.head?._id || ''
     });
     setIsDialogOpen(true);
   };
@@ -224,7 +224,7 @@ export default function Departments() {
                 </p>
                 <div className="flex items-center gap-2 text-sm">
                   <Users className="h-4 w-4" />
-                  <span>Head: {department.head}</span>
+                  <span>Head: {department.head?.name || 'Not Assigned'}</span>
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {department.employeeCount || 0} employees

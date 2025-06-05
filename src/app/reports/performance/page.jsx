@@ -256,16 +256,16 @@ export default function PerformanceReports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {performanceData.recentEvaluations.map((eval) => (
-                    <TableRow key={eval._id}>
-                      <TableCell>{eval.employee}</TableCell>
-                      <TableCell>{eval.department}</TableCell>
+                  {performanceData.recentEvaluations.map((evaluation) => (
+                    <TableRow key={evaluation._id}>
+                      <TableCell>{evaluation.employee}</TableCell>
+                      <TableCell>{evaluation.department}</TableCell>
                       <TableCell>
-                        <span className={getScoreColor(eval.score)}>{eval.score}%</span>
+                        <span className={getScoreColor(evaluation.score)}>{evaluation.score}%</span>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusBadge(eval.status)}>
-                          {eval.status.charAt(0).toUpperCase() + eval.status.slice(1)}
+                        <Badge className={getStatusBadge(evaluation.status)}>
+                          {evaluation.status.charAt(0).toUpperCase() + evaluation.status.slice(1)}
                         </Badge>
                       </TableCell>
                     </TableRow>

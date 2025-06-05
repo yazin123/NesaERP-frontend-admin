@@ -22,13 +22,16 @@ import { Button } from '@/components/ui/button';
 import { monitoringApi } from '@/api';
 import { useAuth } from '@/context/AuthContext';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 
 function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
     const [error, setError] = useState('');
     const { user } = useAuth();
-    const isAdmin = user?.roleLevel >= 70;
+    const { toast } = useToast();
+    const userRoleLevel = user?.role?.level || 0;
+    const canViewAdminDashboard = userRoleLevel >= 70; // Admin level or higher
 
     useEffect(() => {
         fetchDashboardStats();
@@ -36,11 +39,36 @@ function DashboardPage() {
 
     const fetchDashboardStats = async () => {
         try {
-            const response = await monitoringApi.getDashboardStats();
-            setStats(response.data.data);
+            setLoading(true);
+            const response = canViewAdminDashboard 
+                ? await monitoringApi.getDashboardStats()
+                : await monitoringApi.getUserDashboardStats();
+            
+            if (response?.data?.data) {
+                setStats(response.data.data);
+            } else if (response?.data) {
+                setStats(response.data);
+            } else {
+                throw new Error('Invalid response format');
+            }
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);
-            setError('Failed to load dashboard statistics');
+            let errorMessage = 'Failed to load dashboard statistics';
+            
+            if (error.response?.status === 403) {
+                errorMessage = canViewAdminDashboard 
+                    ? 'You do not have permission to view the admin dashboard'
+                    : 'You do not have permission to view the dashboard';
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            }
+            
+            setError(errorMessage);
+            toast({
+                title: 'Error',
+                description: errorMessage,
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }
@@ -92,12 +120,17 @@ function DashboardPage() {
 
     if (error) {
         return (
-            <div>
+            <div className="p-6">
                 <Card>
                     <CardContent className="p-6">
                         <div className="text-center space-y-4">
-                            <h2 className="text-xl font-semibold text-destructive">Error</h2>
+                            <h2 className="text-xl font-semibold text-destructive">Access Denied</h2>
                             <p>{error}</p>
+                            {error.includes('permission') && (
+                                <p className="text-sm text-muted-foreground">
+                                    Please contact your administrator if you believe you should have access.
+                                </p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -105,7 +138,22 @@ function DashboardPage() {
         );
     }
 
-    if (isAdmin) {
+    if (!user) {
+        return (
+            <div className="p-6">
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="text-center space-y-4">
+                            <h2 className="text-xl font-semibold text-destructive">Access Denied</h2>
+                            <p>Please log in to view the dashboard</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (canViewAdminDashboard) {
         return (
             <div className="space-y-6">
                 <div className="flex justify-between items-center">

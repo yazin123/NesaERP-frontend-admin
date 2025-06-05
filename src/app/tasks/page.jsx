@@ -44,29 +44,59 @@ export default function Tasks() {
     try {
       setLoading(true);
       const [tasksResponse, projectsResponse, usersResponse] = await Promise.all([
-        tasksApi.getMyTasks(),
-        projectsApi.getMyProjects(),
-        usersApi.getAllUsers()
+        tasksApi.getMyTasks({
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          project: projectFilter !== 'all' ? projectFilter : undefined,
+          assignee: assigneeFilter !== 'all' ? assigneeFilter : undefined,
+          search: searchTerm || undefined
+        }),
+        projectsApi.getAllProjects(),
+        usersApi.getUsers()
       ]);
 
-      if (tasksResponse.data && Array.isArray(tasksResponse.data)) {
+      // Handle tasks response
+      if (tasksResponse?.data?.data?.tasks) {
+        setTasks(tasksResponse.data.data.tasks);
+      } else if (Array.isArray(tasksResponse?.data?.data)) {
+        setTasks(tasksResponse.data.data);
+      } else if (Array.isArray(tasksResponse?.data)) {
         setTasks(tasksResponse.data);
+      } else {
+        setTasks([]);
+        console.warn('Unexpected tasks response format:', tasksResponse);
       }
 
-      if (projectsResponse.data && Array.isArray(projectsResponse.data)) {
+      // Handle projects response
+      if (projectsResponse?.data?.data?.projects) {
+        setProjects(projectsResponse.data.data.projects);
+      } else if (Array.isArray(projectsResponse?.data?.data)) {
+        setProjects(projectsResponse.data.data);
+      } else if (Array.isArray(projectsResponse?.data)) {
         setProjects(projectsResponse.data);
+      } else {
+        setProjects([]);
+        console.warn('Unexpected projects response format:', projectsResponse);
       }
 
-      if (usersResponse.data && usersResponse.data.users) {
+      // Handle users response
+      if (usersResponse?.data?.users) {
         setAssignees(usersResponse.data.users);
+      } else if (Array.isArray(usersResponse?.data)) {
+        setAssignees(usersResponse.data);
+      } else {
+        setAssignees([]);
+        console.warn('No users found in response');
       }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch data. Please try again later.',
+        description: error.response?.data?.message || 'Failed to fetch data. Please try again later.',
         variant: 'destructive',
       });
+      setTasks([]);
+      setProjects([]);
+      setAssignees([]);
     } finally {
       setLoading(false);
     }

@@ -23,6 +23,7 @@ export const monitoringApi = {
 
   // Dashboard statistics
   getDashboardStats: () => api.get('/admin/dashboard/stats'),
+  getUserDashboardStats: () => api.get('/dashboard/stats'),
 };
 
 export default monitoringApi; 

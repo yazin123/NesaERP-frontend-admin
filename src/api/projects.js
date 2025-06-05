@@ -1,23 +1,19 @@
 import api from './config';
 
-export const projectsApi = {
+const projectsApi = {
   // Project management
   getAllProjects: (params) => api.get('/admin/projects', { params }),
-  getProjectStats: () => api.get('/admin/projects/stats'),
+  getMyProjects: (params) => api.get('/projects/my-projects', { params }),
   getProjectById: (id) => api.get(`/admin/projects/${id}`),
   createProject: (data) => {
     const formData = new FormData();
     Object.keys(data).forEach(key => {
-      if (key === 'files') {
-        if (data[key]) {
-          data[key].forEach(file => formData.append('files', file));
-        }
+      if (key === 'files' && data[key]) {
+        data[key].forEach(file => formData.append('files', file));
       } else if (key === 'startDate' || key === 'endDate') {
         formData.append(key, data[key].toISOString());
-      } else if (typeof data[key] === 'object') {
-        formData.append(key, JSON.stringify(data[key]));
-      } else {
-        formData.append(key, data[key]);
+      } else if (data[key] !== null && data[key] !== undefined) {
+        formData.append(key, typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]);
       }
     });
     return api.post('/admin/projects', formData, {
@@ -27,14 +23,10 @@ export const projectsApi = {
   updateProject: (id, data) => {
     const formData = new FormData();
     Object.keys(data).forEach(key => {
-      if (key === 'files') {
-        if (data[key]) {
-          data[key].forEach(file => formData.append('files', file));
-        }
-      } else if (typeof data[key] === 'object') {
-        formData.append(key, JSON.stringify(data[key]));
-      } else {
-        formData.append(key, data[key]);
+      if (key === 'files' && data[key]) {
+        data[key].forEach(file => formData.append('files', file));
+      } else if (data[key] !== null && data[key] !== undefined) {
+        formData.append(key, typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]);
       }
     });
     return api.put(`/admin/projects/${id}`, formData, {
@@ -42,11 +34,27 @@ export const projectsApi = {
     });
   },
   deleteProject: (id) => api.delete(`/admin/projects/${id}`),
-  updateProjectStatus: (id, status, reason) => {
-    const data = typeof status === 'object' ? status : { status, reason };
-    return api.patch(`/admin/projects/${id}/status`, data);
-  },
-  updateProjectPipeline: (id, data) => api.patch(`/admin/projects/${id}/pipeline`, data),
+  updateProjectStatus: (id, status) => api.patch(`/admin/projects/${id}/status`, { status }),
+  
+  // Project updates
+  getProjectUpdates: (id) => api.get(`/admin/projects/${id}/updates`),
+  addProjectUpdate: (id, update) => api.post(`/admin/projects/${id}/updates`, update),
+
+  // Project tasks
+  getProjectTasks: (projectId) => api.get(`/admin/projects/${projectId}/tasks`),
+  createProjectTask: (projectId, task) => api.post(`/admin/projects/${projectId}/tasks`, task),
+  updateProjectTask: (projectId, taskId, task) => api.put(`/admin/projects/${projectId}/tasks/${taskId}`, task),
+  deleteProjectTask: (projectId, taskId) => api.delete(`/admin/projects/${projectId}/tasks/${taskId}`),
+
+  // Project reports
+  getProjectReports: (projectId, params) => api.get(`/admin/projects/${projectId}/reports`, { params }),
+  createProjectReport: (projectId, data) => api.post(`/admin/projects/${projectId}/reports`, data),
+  updateProjectReport: (projectId, reportId, data) => api.put(`/admin/projects/${projectId}/reports/${reportId}`, data),
+  deleteProjectReport: (projectId, reportId) => api.delete(`/admin/projects/${projectId}/reports/${reportId}`),
+
+  // Project metrics
+  getProjectMetrics: (params) => api.get('/admin/projects/metrics', { params }),
+  getProjectStats: () => api.get('/admin/projects/stats'),
 
   // Project team
   getProjectMembers: (id) => api.get(`/admin/projects/${id}/team`),
@@ -75,22 +83,7 @@ export const projectsApi = {
     });
   },
   deleteProjectDocument: (projectId, documentId) => api.delete(`/admin/projects/${projectId}/documents/${documentId}`),
-
-  // Project reports
-  getProjectReports: (projectId, params) => api.get('/daily-reports', { params: { projectId, ...params } }),
-  createProjectReport: (data) => api.post(`/admin/projects/${data.projectId}/reports`, data),
-  updateProjectReport: (projectId, reportId, data) => api.put(`/admin/projects/${projectId}/reports/${reportId}`, data),
-  deleteProjectReport: (projectId, reportId) => api.delete(`/admin/projects/${projectId}/reports/${reportId}`),
-
-  // Project tasks
-  getProjectTasks: (projectId) => api.get(`/projects/${projectId}/tasks`),
-  createProjectTask: (projectId, task) => api.post(`/projects/${projectId}/tasks`, task),
-  updateProjectTask: (projectId, taskId, task) => api.put(`/projects/${projectId}/tasks/${taskId}`, task),
-  deleteProjectTask: (projectId, taskId) => api.delete(`/projects/${projectId}/tasks/${taskId}`),
   assignProjectTasks: (projectId, data) => api.post(`/projects/${projectId}/assign-tasks`, data),
-
-  // Project metrics
-  getProjectMetrics: (projectId) => api.get(`/admin/projects/${projectId}/metrics`),
 };
 
 export default projectsApi; 

@@ -55,16 +55,25 @@ export default function Roles() {
     try {
       setLoading(true);
       const response = await organizationApi.getAllRoles();
-      if (response.data && Array.isArray(response.data)) {
+      
+      if (response?.data?.data?.roles) {
+        setRoles(response.data.data.roles);
+      } else if (Array.isArray(response?.data?.data)) {
+        setRoles(response.data.data);
+      } else if (Array.isArray(response?.data)) {
         setRoles(response.data);
+      } else {
+        setRoles([]);
+        console.warn('Unexpected roles response format:', response);
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch roles. Please try again later.',
+        description: error.response?.data?.message || 'Failed to fetch roles. Please try again later.',
         variant: 'destructive',
       });
+      setRoles([]);
     } finally {
       setLoading(false);
     }
@@ -314,8 +323,8 @@ export default function Roles() {
                   Access Level: {role.level}
                 </div>
                 <div className="space-y-2">
-                  {Object.entries(role.permissions).map(([module, permissions]) => (
-                    permissions.length > 0 && (
+                  {Object.entries(role.permissions || {}).map(([module, permissions]) => (
+                    Array.isArray(permissions) && permissions.length > 0 && (
                       <div key={module} className="text-sm">
                         <span className="font-medium">{permissionModules[module]}:</span>
                         <div className="flex flex-wrap gap-1 mt-1">

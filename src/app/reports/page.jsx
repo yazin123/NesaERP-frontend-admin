@@ -22,14 +22,25 @@ export default function DailyReportsPage() {
   const fetchProjects = async () => {
     try {
       const response = await projectsApi.getMyProjects();
-      setProjects(response.data.projects || []);
+      
+      if (response?.data?.data?.projects) {
+        setProjects(response.data.data.projects);
+      } else if (Array.isArray(response?.data?.data)) {
+        setProjects(response.data.data);
+      } else if (Array.isArray(response?.data)) {
+        setProjects(response.data);
+      } else {
+        setProjects([]);
+        console.warn('Unexpected projects response format:', response);
+      }
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to fetch projects',
+        description: error.response?.data?.message || 'Failed to fetch projects',
         variant: 'destructive'
       });
+      setProjects([]);
     }
   };
 
@@ -68,20 +79,23 @@ export default function DailyReportsPage() {
         ...report,
         projectId: report.projectId || undefined
       }));
-      await reportsApi.submitDailyReports({ reports: reportsToSubmit });
+      const response = await reportsApi.submitDailyReports({ reports: reportsToSubmit });
       
-      toast({
-        title: 'Success',
-        description: 'Daily reports submitted successfully'
-      });
-
-      // Reset form
-      setReports([{ projectId: null, content: '' }]);
+      if (response?.data?.success) {
+        toast({
+          title: 'Success',
+          description: response.data.message || 'Daily reports submitted successfully'
+        });
+        // Reset form
+        setReports([{ projectId: null, content: '' }]);
+      } else {
+        throw new Error(response?.data?.message || 'Failed to submit reports');
+      }
     } catch (error) {
       console.error('Error submitting reports:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to submit reports',
+        description: error.response?.data?.message || error.message || 'Failed to submit reports',
         variant: 'destructive'
       });
     } finally {

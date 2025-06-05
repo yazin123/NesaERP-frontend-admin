@@ -34,15 +34,18 @@ export default function DailyReports() {
   const fetchReports = async () => {
     try {
       setLoading(true);
-      const response = await reportsApi.getDailyReports();
-      if (response.data && Array.isArray(response.data)) {
+      const response = await reportsApi.getDailyReports({
+        startDate: selectedDate,
+        endDate: selectedDate
+      });
+      if (response.data) {
         setReports(response.data);
       }
     } catch (error) {
       console.error('Error fetching reports:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch reports. Please try again later.',
+        description: error.response?.data?.message || 'Failed to fetch reports. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -53,7 +56,7 @@ export default function DailyReports() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await reportsApi.createDailyReport(newReport);
+      await reportsApi.submitDailyReport(newReport);
       toast({
         title: 'Success',
         description: 'Report submitted successfully',
@@ -65,7 +68,7 @@ export default function DailyReports() {
       console.error('Error submitting report:', error);
       toast({
         title: 'Error',
-        description: 'Failed to submit report. Please try again.',
+        description: error.response?.data?.message || 'Failed to submit report. Please try again.',
         variant: 'destructive',
       });
     }

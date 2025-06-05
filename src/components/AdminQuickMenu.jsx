@@ -10,15 +10,16 @@ import {
 } from '@/components/ui/navigation-menu';
 import { cn } from '@/lib/utils';
 
-export function AdminNav() {
+export function AdminQuickMenu() {
     const router = useRouter();
     const { user } = useAuth();
+    const userRoleLevel = user?.role?.level || 0;
 
-    // Check if user has admin permissions
-    const canManageDepartments = user?.permissions?.includes('manage_departments');
-    const canManageDesignations = user?.permissions?.includes('manage_designations');
-    const canManageSystemEnums = user?.permissions?.includes('manage_system_enums');
-    const canManageUsers = user?.permissions?.includes('manage_users');
+    // Define access levels for different features
+    const canManageDepartments = userRoleLevel >= 80;
+    const canManageDesignations = userRoleLevel >= 80;
+    const canManageSystemEnums = userRoleLevel >= 90;
+    const canManageUsers = userRoleLevel >= 70;
 
     if (!canManageDepartments && !canManageDesignations && !canManageSystemEnums && !canManageUsers) {
         return null;
@@ -28,7 +29,7 @@ export function AdminNav() {
         <NavigationMenu>
             <NavigationMenuList>
                 <NavigationMenuItem>
-                    <NavigationMenuTrigger>Administration</NavigationMenuTrigger>
+                    <NavigationMenuTrigger>Quick Admin Access</NavigationMenuTrigger>
                     <NavigationMenuContent>
                         <ul className="grid gap-3 p-4 w-[400px] md:w-[500px] lg:w-[600px]">
                             {canManageUsers && (
@@ -36,7 +37,7 @@ export function AdminNav() {
                                     title="User Management"
                                     href="/employees"
                                 >
-                                    Manage employees, roles, and permissions.
+                                    Quick access to manage employees, roles, and permissions.
                                 </ListItem>
                             )}
                             {canManageDepartments && (
@@ -44,7 +45,7 @@ export function AdminNav() {
                                     title="Organization Structure"
                                     href="/admin/organization"
                                 >
-                                    Manage departments and designations within your organization.
+                                    Quick access to manage departments and designations.
                                 </ListItem>
                             )}
                             {canManageSystemEnums && (
@@ -52,7 +53,7 @@ export function AdminNav() {
                                     title="System Enums"
                                     href="/admin/enums"
                                 >
-                                    Configure system-wide enumerations and lookup values.
+                                    Quick access to configure system-wide enumerations.
                                 </ListItem>
                             )}
                         </ul>

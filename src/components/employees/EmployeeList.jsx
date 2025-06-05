@@ -192,6 +192,9 @@ const EmployeeList = () => {
         return colors[status] || 'bg-gray-500';
     };
 
+    const userRoleLevel = user?.role?.level || 0;
+    const canManageEmployees = userRoleLevel >= 70; // Admin level or higher
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
@@ -213,7 +216,7 @@ const EmployeeList = () => {
                             <Grid className="h-4 w-4" />
                         </Button>
                     </div>
-                    {user?.role === 'admin' && (
+                    {canManageEmployees && (
                         <Button asChild>
                             <Link href="/employees/create">
                                 <Plus className="mr-2 h-4 w-4" />
@@ -396,7 +399,7 @@ const EmployeeList = () => {
                                                         View Profile
                                                     </Link>
                                                 </DropdownMenuItem>
-                                                {user?.role === 'admin' && (
+                                                {canManageEmployees && (
                                                     <>
                                                         <DropdownMenuItem asChild>
                                                             <Link href={`/employees/${employee._id}/edit`}>
@@ -462,7 +465,7 @@ const EmployeeList = () => {
                                             View Profile
                                         </Link>
                                     </Button>
-                                    {user?.role === 'admin' && (
+                                    {canManageEmployees && (
                                         <>
                                             <Button variant="ghost" size="sm" asChild>
                                                 <Link href={`/employees/${employee._id}/edit`}>

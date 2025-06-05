@@ -35,9 +35,15 @@ const Sidebar = ({ isOpen, onClose }) => {
     const pathname = usePathname();
     const router = useRouter();
     const { user } = useAuth();
-    const isAdmin = user?.roleLevel >= 70;
+    const userPermissions = user?.permissions || [];
+    const isSuperAdmin = user?.role === 'superadmin';
 
-    // Common navigation items
+    // Helper function to check permissions
+    const hasPermission = (requiredPermission) => {
+        return isSuperAdmin || userPermissions.includes(requiredPermission) || userPermissions.includes('*');
+    };
+
+    // Common navigation items - available to all authenticated users
     const commonItems = [
         {
             title: 'Dashboard',
@@ -76,63 +82,155 @@ const Sidebar = ({ isOpen, onClose }) => {
         }
     ];
 
-    // Admin navigation items
+    // Admin navigation items with required permissions
     const adminItems = [
         {
             title: 'Organization',
             icon: Building2,
+            requiredPermission: 'organization.manage',
             items: [
-                { title: 'Departments', href: '/admin/departments' },
-                { title: 'Designations', href: '/admin/designations' },
-                { title: 'Roles', href: '/admin/roles' }
+                { 
+                    title: 'Departments', 
+                    href: '/admin/departments',
+                    requiredPermission: 'department.manage'
+                },
+                { 
+                    title: 'Designations', 
+                    href: '/admin/designations',
+                    requiredPermission: 'designation.manage'
+                },
+                { 
+                    title: 'Roles', 
+                    href: '/admin/roles',
+                    requiredPermission: 'role.manage'
+                }
             ]
         },
         {
             title: 'Users',
             icon: Users,
+            requiredPermission: 'user.manage',
             items: [
-                { title: 'All Users', href: '/employees' },
-                { title: 'Add User', href: '/employees/create' },
-                { title: 'Performance', href: '/admin/performance' }
+                { 
+                    title: 'All Users', 
+                    href: '/employees',
+                    requiredPermission: 'user.read'
+                },
+                { 
+                    title: 'Add User', 
+                    href: '/employees/create',
+                    requiredPermission: 'user.create'
+                },
+                { 
+                    title: 'Performance', 
+                    href: '/admin/performance',
+                    requiredPermission: 'performance.manage'
+                }
             ]
         },
         {
             title: 'Projects',
             icon: Briefcase,
+            requiredPermission: 'project.manage',
             items: [
-                { title: 'All Projects', href: '/projects' },
-                { title: 'Create Project', href: '/projects/create' },
-                { title: 'Kanban Board', href: '/projects/board' }
+                { 
+                    title: 'All Projects', 
+                    href: '/projects',
+                    requiredPermission: 'project.read'
+                },
+                { 
+                    title: 'Create Project', 
+                    href: '/projects/create',
+                    requiredPermission: 'project.create'
+                },
+                { 
+                    title: 'Kanban Board', 
+                    href: '/projects/board',
+                    requiredPermission: 'project.read'
+                }
             ]
         },
         {
             title: 'Tasks',
             icon: ClipboardList,
+            requiredPermission: 'task.manage',
             items: [
-                { title: 'All Tasks', href: '/tasks' },
-                { title: 'Create Task', href: '/tasks/create' },
-                { title: 'Task Board', href: '/tasks/board' }
+                { 
+                    title: 'All Tasks', 
+                    href: '/tasks',
+                    requiredPermission: 'task.read'
+                },
+                { 
+                    title: 'Create Task', 
+                    href: '/tasks/create',
+                    requiredPermission: 'task.create'
+                },
+                { 
+                    title: 'Task Board', 
+                    href: '/tasks/board',
+                    requiredPermission: 'task.read'
+                }
             ]
         },
         {
             title: 'Reports',
             icon: FileSpreadsheet,
+            requiredPermission: 'report.manage',
             items: [
-                { title: 'Project Reports', href: '/reports/projects' },
-                { title: 'User Reports', href: '/reports/users' },
-                { title: 'Performance Reports', href: '/reports/performance' }
+                { 
+                    title: 'Project Reports', 
+                    href: '/reports/projects',
+                    requiredPermission: 'report.project.read'
+                },
+                { 
+                    title: 'User Reports', 
+                    href: '/reports/users',
+                    requiredPermission: 'report.user.read'
+                },
+                { 
+                    title: 'Performance Reports', 
+                    href: '/reports/performance',
+                    requiredPermission: 'report.performance.read'
+                }
             ]
         },
         {
             title: 'System',
             icon: Settings,
+            requiredPermission: 'system.manage',
             items: [
-                { title: 'System Enums', href: '/admin/enums' },
-                { title: 'Monitoring', href: '/admin/monitoring' },
-                { title: 'Settings', href: '/admin/settings' }
+                { 
+                    title: 'System Enums', 
+                    href: '/admin/enums',
+                    requiredPermission: 'system.enum.manage'
+                },
+                { 
+                    title: 'Monitoring', 
+                    href: '/admin/monitoring',
+                    requiredPermission: 'system.monitoring.read'
+                },
+                { 
+                    title: 'Settings', 
+                    href: '/admin/settings',
+                    requiredPermission: 'system.settings.manage'
+                }
             ]
         }
     ];
+
+    // Filter admin items based on permissions
+    const filteredAdminItems = adminItems.filter(item => {
+        // Check main item permission
+        if (!hasPermission(item.requiredPermission)) {
+            return false;
+        }
+        // Filter sub-items based on permissions
+        item.items = item.items.filter(subItem => 
+            hasPermission(subItem.requiredPermission)
+        );
+        // Only include the main item if it has accessible sub-items
+        return item.items.length > 0;
+    });
 
     // Close sidebar on route change for mobile
     useEffect(() => {
@@ -269,18 +367,18 @@ const Sidebar = ({ isOpen, onClose }) => {
                         ))}
 
                         {/* Admin Navigation Items */}
-                        {isAdmin && (
-                            <>
+                        {filteredAdminItems.map((section, index) => (
+                            <React.Fragment key={section.title}>
                                 <div className="mt-6 mb-2 px-2">
                                     <h3 className="text-sm font-medium text-muted-foreground">
-                                        Admin
+                                        {section.title}
                                     </h3>
                                 </div>
-                                {adminItems.map((item) => (
+                                {section.items.map((item) => (
                                     <NavItem key={item.title} item={item} />
                                 ))}
-                            </>
-                        )}
+                            </React.Fragment>
+                        ))}
                     </nav>
                 </ScrollArea>
             </div>

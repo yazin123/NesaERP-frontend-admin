@@ -21,18 +21,25 @@ export default function MyProjects() {
     try {
       setLoading(true);
       const response = await projectsApi.getMyProjects();
-      if (response.data && Array.isArray(response.data)) {
+      
+      if (response?.data?.data?.projects) {
+        setProjects(response.data.data.projects);
+      } else if (Array.isArray(response?.data?.data)) {
+        setProjects(response.data.data);
+      } else if (Array.isArray(response?.data)) {
         setProjects(response.data);
       } else {
-        throw new Error('Invalid response format');
+        setProjects([]);
+        console.warn('Unexpected projects response format:', response);
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch projects. Please try again later.',
+        description: error.response?.data?.message || 'Failed to fetch projects. Please try again later.',
         variant: 'destructive',
       });
+      setProjects([]);
     } finally {
       setLoading(false);
     }

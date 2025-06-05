@@ -9,6 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.10",
+    "@fullcalendar/daygrid": "^6.1.10",
+    "@fullcalendar/interaction": "^6.1.10",
+    "@fullcalendar/list": "^6.1.10",
+    "@fullcalendar/react": "^6.1.10",
+    "@fullcalendar/timegrid": "^6.1.10",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -66,13 +72,7 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
     "winston": "^3.17.0",
-    "zod": "^3.25.32",
-    "@fullcalendar/core": "^6.1.10",
-    "@fullcalendar/daygrid": "^6.1.10",
-    "@fullcalendar/interaction": "^6.1.10",
-    "@fullcalendar/list": "^6.1.10",
-    "@fullcalendar/react": "^6.1.10",
-    "@fullcalendar/timegrid": "^6.1.10"
+    "zod": "^3.25.32"
   },
   "devDependencies": {
     "@types/node": "^20.9.1",

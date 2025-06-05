@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import api from '@/api';
+import usersApi from '@/api/users';
 
 const EmployeeDetails = ({ employeeId }) => {
     const { user } = useAuth();
@@ -96,8 +97,7 @@ const EmployeeDetails = ({ employeeId }) => {
     const fetchEmployeeDetails = async () => {
         try {
             setLoading(true);
-            const response = await api.admin.getEmployeeById(employeeId);
-            console.log("response", response);
+            const response = await usersApi.getEmployeeById(employeeId);
             setEmployee(response.data);
             setEditedData(response.data); // Initialize edited data with current data
             setError(null);

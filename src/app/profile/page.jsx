@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/api';
 
 export default function ProfilePage() {
-  const { user, updateUser } = useAuth();
+  const { user, updateProfile } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -31,9 +31,8 @@ export default function ProfilePage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await usersApi.updateProfile(profileData);
-      if (response?.data?.success) {
-        updateUser(response.data.data);
+      const response = await updateProfile(profileData);
+      if (response) {
         toast({
           title: 'Success',
           description: 'Profile updated successfully',
@@ -93,72 +92,75 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-10">
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
-
         <TabsContent value="profile">
           <Card>
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
+              <CardTitle>Profile Settings</CardTitle>
               <CardDescription>
-                Update your personal information and profile picture
+                Update your personal information
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={profileData.photo} />
-                  <AvatarFallback>{profileData.name?.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <Button variant="outline">Change Photo</Button>
-              </div>
-
+            <CardContent>
               <form onSubmit={handleProfileUpdate} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      value={profileData.name}
-                      onChange={(e) =>
-                        setProfileData((prev) => ({ ...prev, name: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={profileData.email}
-                      onChange={(e) =>
-                        setProfileData((prev) => ({ ...prev, email: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={profileData.phone}
-                      onChange={(e) =>
-                        setProfileData((prev) => ({ ...prev, phone: e.target.value }))
-                      }
-                    />
-                  </div>
+                <div className="flex items-center space-x-4">
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src={user?.photo} />
+                    <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={profileData.name}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profileData.email}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={profileData.phone}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        phone: e.target.value,
+                      }))
+                    }
+                  />
                 </div>
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? 'Saving...' : 'Save Changes'}
+                  {isLoading ? 'Updating...' : 'Update Profile'}
                 </Button>
               </form>
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="security">
           <Card>
             <CardHeader>
