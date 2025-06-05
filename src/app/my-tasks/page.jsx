@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/api';
+import { tasksApi, projectsApi, usersApi } from '@/api';
 
 export default function MyTasksPage() {
   const [tasks, setTasks] = useState([]);
@@ -36,7 +36,7 @@ export default function MyTasksPage() {
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
-      const response = await api.common.getMyTasks({
+      const response = await tasksApi.getMyTasks({
         status: filters.status,
         priority: filters.priority,
         search: filters.search
@@ -78,7 +78,7 @@ export default function MyTasksPage() {
 
   const handleUpdateStatus = async (taskId, newStatus) => {
     try {
-      await api.common.updateTaskStatus(taskId, { status: newStatus });
+      await tasksApi.updateTaskStatus(taskId, { status: newStatus });
       await fetchTasks();
       toast({
         title: 'Success',

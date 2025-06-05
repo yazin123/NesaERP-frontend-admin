@@ -20,7 +20,15 @@ import {
     XCircle,
     Clock
 } from 'lucide-react';
-import api from '@/api';
+import { monitoringApi } from '@/api';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 export function MonitoringDashboard() {
     const [metrics, setMetrics] = useState(null);
@@ -30,20 +38,21 @@ export function MonitoringDashboard() {
     const [error, setError] = useState(null);
     const { toast } = useToast();
     const [refreshKey, setRefreshKey] = useState(0);
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
         fetchMetrics();
-        const interval = setInterval(fetchMetrics, 30000); // Refresh every 30 seconds
+        const interval = setInterval(fetchMetrics, 60000); // Refresh every minute
         return () => clearInterval(interval);
-    }, [refreshKey]);
+    }, []);
 
     const fetchMetrics = async () => {
         try {
-            setLoading(true);
+            setRefreshing(true);
             const [metricsData, queueData, healthData] = await Promise.all([
-                api.get('/admin/monitoring/detailed-metrics'),
-                api.get('/admin/monitoring/email-queue'),
-                api.get('/admin/monitoring/health')
+                monitoringApi.getSystemMetrics(),
+                monitoringApi.getEmailQueue(),
+                monitoringApi.getSystemHealth()
             ]);
 
             setMetrics(metricsData.data);
@@ -58,13 +67,14 @@ export function MonitoringDashboard() {
                 variant: 'destructive',
             });
         } finally {
+            setRefreshing(false);
             setLoading(false);
         }
     };
 
     const clearFailedJobs = async () => {
         try {
-            await api.post('/admin/monitoring/email-queue/clear-failed');
+            await monitoringApi.clearFailedEmails();
             toast({
                 title: 'Success',
                 description: 'Failed jobs cleared successfully',
@@ -106,6 +116,33 @@ export function MonitoringDashboard() {
         </Card>
     );
 
+    const getStatusColor = (status) => {
+        const colors = {
+            healthy: 'bg-green-500',
+            warning: 'bg-yellow-500',
+            critical: 'bg-red-500'
+        };
+        return colors[status] || 'bg-gray-500';
+    };
+
+    const handleRestartService = async (service) => {
+        try {
+            await monitoringApi.restartService(service);
+            toast({
+                title: 'Success',
+                description: `${service} service restarted successfully`,
+            });
+            fetchMetrics();
+        } catch (error) {
+            console.error('Error restarting service:', error);
+            toast({
+                title: 'Error',
+                description: error.message || `Failed to restart ${service} service`,
+                variant: 'destructive',
+            });
+        }
+    };
+
     if (loading) {
         return (
             <div className="container mx-auto p-6">
@@ -128,13 +165,26 @@ export function MonitoringDashboard() {
         );
     }
 
+    if (!metrics) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <AlertTriangle className="h-8 w-8 text-muted-foreground" />
+                <p className="ml-2">No metrics data available</p>
+            </div>
+        );
+    }
+
     return (
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold">System Monitoring</h1>
-                <Button onClick={() => setRefreshKey(k => k + 1)} className="flex items-center gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh
+                <Button
+                    onClick={fetchMetrics}
+                    disabled={refreshing}
+                    className="flex items-center gap-2"
+                >
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
                 </Button>
             </div>
 
@@ -307,6 +357,48 @@ export function MonitoringDashboard() {
                     </div>
                 </TabsContent>
             </Tabs>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Service Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Service</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Uptime</TableHead>
+                                <TableHead>Last Restart</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {metrics.services.map((service) => (
+                                <TableRow key={service.name}>
+                                    <TableCell>{service.name}</TableCell>
+                                    <TableCell>
+                                        <Badge className={getStatusColor(service.status)}>
+                                            {service.status.toUpperCase()}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>{service.uptime}</TableCell>
+                                    <TableCell>{new Date(service.lastRestart).toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleRestartService(service.name)}
+                                        >
+                                            Restart
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
         </div>
     );
 } 

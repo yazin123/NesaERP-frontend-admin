@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PlusCircle, MinusCircle } from 'lucide-react';
-import api from '@/api';
+import { projectsApi, reportsApi } from '@/api';
 
 export default function DailyReportsPage() {
   const [projects, setProjects] = useState([]);
@@ -21,7 +21,7 @@ export default function DailyReportsPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await api.getMyProjects();
+      const response = await projectsApi.getMyProjects();
       setProjects(response.data.projects || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -68,7 +68,7 @@ export default function DailyReportsPage() {
         ...report,
         projectId: report.projectId || undefined
       }));
-      await api.submitDailyReports({ reports: reportsToSubmit });
+      await reportsApi.submitDailyReports({ reports: reportsToSubmit });
       
       toast({
         title: 'Success',

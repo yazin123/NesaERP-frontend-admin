@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Plus, UserPlus } from 'lucide-react';
+import { projectsApi } from '@/api';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/api';
 import {
   Select,
   SelectContent,
@@ -15,12 +16,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function ProjectTeam({ projectId }) {
+export default function ProjectTeam({ projectId }) {
   const [team, setTeam] = useState([]);
   const [availableMembers, setAvailableMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState('');
   const [selectedRole, setSelectedRole] = useState('developer');
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -30,25 +31,26 @@ export function ProjectTeam({ projectId }) {
 
   const fetchTeam = async () => {
     try {
-      const response = await api.admin.getProjectMembers(projectId);
-      if (response?.data?.team) {
-        setTeam(response.data.team);
+      setLoading(true);
+      const response = await projectsApi.getProjectMembers(projectId);
+      if (response.data) {
+        setTeam(response.data);
       }
     } catch (error) {
       console.error('Error fetching team:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch team members',
+        description: 'Failed to fetch team members. Please try again later.',
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const fetchAvailableMembers = async () => {
     try {
-      const response = await api.admin.getEmployees();
+      const response = await projectsApi.getEmployees();
       if (response?.data?.data?.users) {
         setAvailableMembers(response.data.data.users);
       }
@@ -61,7 +63,7 @@ export function ProjectTeam({ projectId }) {
     if (!selectedMember) return;
 
     try {
-      await api.admin.addProjectMembers(projectId, {
+      await projectsApi.addProjectMembers(projectId, {
         members: [{ userId: selectedMember, role: selectedRole }]
       });
       
@@ -84,19 +86,17 @@ export function ProjectTeam({ projectId }) {
 
   const handleRemoveMember = async (memberId) => {
     try {
-      await api.admin.removeProjectMember(projectId, memberId);
-      
+      await projectsApi.removeProjectMember(projectId, memberId);
       toast({
         title: 'Success',
         description: 'Team member removed successfully',
       });
-      
       fetchTeam();
     } catch (error) {
       console.error('Error removing team member:', error);
       toast({
         title: 'Error',
-        description: 'Failed to remove team member',
+        description: error.message || 'Failed to remove team member',
         variant: 'destructive',
       });
     }
@@ -104,7 +104,7 @@ export function ProjectTeam({ projectId }) {
 
   const handleRoleChange = async (memberId, newRole) => {
     try {
-      await api.admin.updateMemberRole(projectId, memberId, { role: newRole });
+      await projectsApi.updateMemberRole(projectId, memberId, { role: newRole });
       
       toast({
         title: 'Success',
@@ -122,14 +122,31 @@ export function ProjectTeam({ projectId }) {
     }
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Project Team</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Project Team</CardTitle>
+        <Button size="sm">
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add Member
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -163,43 +180,21 @@ export function ProjectTeam({ projectId }) {
           </div>
 
           <div className="grid gap-4">
-            {team.map(member => (
-              <div key={member._id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-4">
+            {team.map((member) => (
+              <div key={member._id} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
                   <Avatar>
-                    <AvatarImage src={member.user?.avatar} />
-                    <AvatarFallback>{member.user?.name?.charAt(0) || 'U'}</AvatarFallback>
+                    <AvatarImage src={member.photo} />
+                    <AvatarFallback>
+                      {member.name.split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="font-medium">{member.user?.name}</div>
-                    <div className="text-sm text-muted-foreground">{member.user?.email}</div>
+                    <div className="font-medium">{member.name}</div>
+                    <div className="text-sm text-muted-foreground">{member.role}</div>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-4">
-                  <Select 
-                    value={member.role} 
-                    onValueChange={(value) => handleRoleChange(member._id, value)}
-                  >
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="developer">Developer</SelectItem>
-                      <SelectItem value="designer">Designer</SelectItem>
-                      <SelectItem value="tester">Tester</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => handleRemoveMember(member._id)}
-                  >
-                    Remove
-                  </Button>
-                </div>
+                <Badge>{member.designation}</Badge>
               </div>
             ))}
           </div>

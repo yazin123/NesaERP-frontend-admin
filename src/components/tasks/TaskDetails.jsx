@@ -15,12 +15,24 @@ import {
 } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/api';
+import { tasksApi } from '@/api';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function TaskDetails({ taskId, isAdmin = false }) {
   const [task, setTask] = useState(null);
   const [comment, setComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: '',
+    priority: '',
+    dueDate: '',
+    assignedTo: ''
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -30,15 +42,24 @@ export default function TaskDetails({ taskId, isAdmin = false }) {
   const fetchTaskDetails = async () => {
     try {
       setIsLoading(true);
-      const response = await (isAdmin 
-        ? api.admin.getTaskById(taskId)
-        : api.common.getTaskById(taskId));
-      setTask(response.data);
+      const response = await tasksApi.getTaskById(taskId);
+      if (response.data) {
+        setTask(response.data);
+        setFormData({
+          title: response.data.title,
+          description: response.data.description,
+          status: response.data.status,
+          priority: response.data.priority,
+          dueDate: response.data.dueDate.split('T')[0],
+          assignedTo: response.data.assignedTo?._id
+        });
+      }
     } catch (error) {
+      console.error('Error fetching task:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch task details',
-        variant: 'destructive'
+        description: 'Failed to fetch task details. Please try again later.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -47,7 +68,7 @@ export default function TaskDetails({ taskId, isAdmin = false }) {
 
   const handleUpdateStatus = async (newStatus) => {
     try {
-      await api.common.updateTaskStatus(taskId, { status: newStatus });
+      await tasksApi.updateTaskStatus(taskId, { status: newStatus });
       await fetchTaskDetails();
       toast({
         title: 'Success',
@@ -64,7 +85,7 @@ export default function TaskDetails({ taskId, isAdmin = false }) {
 
   const handleAddComment = async () => {
     try {
-      await api.common.addTaskComment(taskId, { comment });
+      await tasksApi.addTaskComment(taskId, { comment });
       setComment('');
       await fetchTaskDetails();
       toast({
@@ -80,40 +101,181 @@ export default function TaskDetails({ taskId, isAdmin = false }) {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed': return 'bg-green-100 text-green-800';
-      case 'Progress': return 'bg-blue-100 text-blue-800';
-      case 'Not Completed': return 'bg-red-100 text-red-800';
-      case 'Missed': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+      const response = await tasksApi.updateTask(taskId, formData);
+      if (response.data) {
+        setTask(response.data);
+        setEditing(false);
+        toast({
+          title: 'Success',
+          description: 'Task updated successfully',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update task',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const handleChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      todo: 'bg-gray-500',
+      in_progress: 'bg-blue-500',
+      review: 'bg-yellow-500',
+      completed: 'bg-green-500'
+    };
+    return colors[status] || 'bg-gray-500';
+  };
+
   const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'High': return 'bg-red-100 text-red-800';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800';
-      case 'Low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+    const colors = {
+      low: 'text-gray-500',
+      medium: 'text-yellow-500',
+      high: 'text-orange-500',
+      urgent: 'text-red-500'
+    };
+    return colors[priority] || 'text-gray-500';
   };
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-100 rounded w-1/4" />
-        <div className="h-24 bg-gray-100 rounded" />
-        <div className="h-12 bg-gray-100 rounded w-1/2" />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Task Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="h-8 bg-gray-200 rounded animate-pulse" />
+            <div className="h-24 bg-gray-200 rounded animate-pulse" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-8 bg-gray-200 rounded animate-pulse" />
+              <div className="h-8 bg-gray-200 rounded animate-pulse" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!task) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        Task not found.
-      </div>
+      <Card>
+        <CardContent className="flex items-center justify-center h-48">
+          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+          <p className="ml-2">Task not found</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (editing) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Edit Task</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => handleChange('title', e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => handleChange('description', e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => handleChange('status', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todo">To Do</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value) => handleChange('priority', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => handleChange('dueDate', e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditing(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -123,7 +285,7 @@ export default function TaskDetails({ taskId, isAdmin = false }) {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div className="space-y-2">
-              <CardTitle>{task.description}</CardTitle>
+              <CardTitle>{task.title}</CardTitle>
               {task.project && (
                 <div className="text-sm text-muted-foreground">
                   Project: {task.project.name}
@@ -131,10 +293,10 @@ export default function TaskDetails({ taskId, isAdmin = false }) {
               )}
               <div className="flex gap-2">
                 <Badge className={getStatusColor(task.status)}>
-                  {task.status}
+                  {task.status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                 </Badge>
                 <Badge className={getPriorityColor(task.priority)}>
-                  {task.priority}
+                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                 </Badge>
                 {task.isDaily && (
                   <Badge variant="outline">Daily</Badge>

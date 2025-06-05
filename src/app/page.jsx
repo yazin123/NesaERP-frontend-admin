@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/context/AuthContext';
@@ -19,10 +19,16 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
     const router = useRouter();
-    const { login } = useAuth();
+    const { login, isAuthenticated } = useAuth();
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            router.push('/dashboard');
+        }
+    }, [isAuthenticated, router]);
 
     const { register, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {
@@ -45,76 +51,62 @@ export default function LoginPage() {
         } catch (error) {
             console.error('Login error:', error);
             setError(error?.response?.data?.message || 'Invalid credentials');
+            toast({
+                title: 'Error',
+                description: error?.response?.data?.message || 'Invalid credentials',
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-            <Card className="w-full max-w-md">
-                <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
-                    <CardDescription className="text-center">
-                        Enter your credentials to access your account
+        <div className="min-h-screen flex items-center justify-center bg-background">
+            <Card className="w-[400px]">
+                <CardHeader>
+                    <CardTitle>Welcome Back</CardTitle>
+                    <CardDescription>
+                        Please sign in to continue
                     </CardDescription>
                 </CardHeader>
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <CardContent className="space-y-4">
-                        {error && (
-                            <Alert variant="destructive">
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
-                        )}
+                <CardContent>
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="userId">
-                                User ID
-                            </label>
                             <Input
-                                id="userId"
-                                type="text"
-                                placeholder="Enter your user ID"
-                                {...register('userId', {
-                                    required: 'User ID is required'
-                                })}
-                                error={errors.userId?.message}
+                                {...register('userId', { required: 'User ID is required' })}
+                                placeholder="User ID"
+                                disabled={loading}
                             />
                             {errors.userId && (
                                 <p className="text-sm text-destructive">{errors.userId.message}</p>
                             )}
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="password">
-                                Password
-                            </label>
                             <Input
-                                id="password"
+                                {...register('password', { required: 'Password is required' })}
                                 type="password"
-                                placeholder="Enter your password"
-                                {...register('password', {
-                                    required: 'Password is required',
-                                    minLength: {
-                                        value: 6,
-                                        message: 'Password must be at least 6 characters'
-                                    }
-                                })}
-                                error={errors.password?.message}
+                                placeholder="Password"
+                                disabled={loading}
                             />
                             {errors.password && (
                                 <p className="text-sm text-destructive">{errors.password.message}</p>
                             )}
                         </div>
-                    </CardContent>
-                    <CardFooter>
+                        {error && (
+                            <Alert variant="destructive">
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
                         <Button
                             type="submit"
                             className="w-full"
                             disabled={loading}
                         >
-                            {loading ? 'Signing in...' : 'Sign in'}
+                            {loading ? 'Signing in...' : 'Sign In'}
                         </Button>
-                    </CardFooter>
-                </form>
+                    </form>
+                </CardContent>
             </Card>
         </div>
     );

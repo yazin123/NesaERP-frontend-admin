@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import api from '@/api';
+import { usersApi } from '@/api';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -31,7 +31,7 @@ export default function ProfilePage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await api.user.updateProfile(profileData);
+      const response = await usersApi.updateProfile(profileData);
       if (response?.data?.success) {
         updateUser(response.data.data);
         toast({
@@ -64,7 +64,7 @@ export default function ProfilePage() {
 
     setIsLoading(true);
     try {
-      const response = await api.user.changePassword({
+      const response = await usersApi.changePassword({
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword,
       });

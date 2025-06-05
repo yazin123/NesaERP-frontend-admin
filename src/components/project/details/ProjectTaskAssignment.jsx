@@ -21,10 +21,10 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/api';
+import { projectsApi } from '@/api';
 
-export function ProjectTaskAssignment({ projectId, members }) {
-    console.log("members", members);
+export function ProjectTaskAssignment({ projectId, teamMembers }) {
+    console.log("members", teamMembers);
   const [tasks, setTasks] = useState([{
     description: '',
     assignees: [],
@@ -91,23 +91,21 @@ export function ProjectTaskAssignment({ projectId, members }) {
         return;
       }
 
-      const response = await api.assignProjectTasks(projectId, { tasks });
+      await projectsApi.assignProjectTasks(projectId, { tasks });
 
-      if (response.data.success) {
-        toast({
-          title: 'Success',
-          description: 'Tasks assigned successfully'
-        });
+      toast({
+        title: 'Success',
+        description: 'Tasks assigned successfully'
+      });
 
-        // Reset form
-        setTasks([{
-          description: '',
-          assignees: [],
-          deadline: '',
-          priority: 'Medium',
-          isDaily: false
-        }]);
-      }
+      // Reset form
+      setTasks([{
+        description: '',
+        assignees: [],
+        deadline: '',
+        priority: 'Medium',
+        isDaily: false
+      }]);
     } catch (error) {
       console.error('Error assigning tasks:', error);
       toast({
@@ -172,7 +170,7 @@ export function ProjectTaskAssignment({ projectId, members }) {
                 <div className="space-y-2">
                   <h4 className="font-medium">Assignees</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {members?.members?.map((member) => (
+                    {teamMembers?.members?.map((member) => (
                       <div key={member._id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`${index}-${member._id}`}

@@ -1,30 +1,31 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
-import { Calendar, Users, Clock, AlertCircle, ChevronRight } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import api from '@/api';
-import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from '@/components/ui/badge';
+import { Search, Plus, Calendar, Users } from 'lucide-react';
+import { projectsApi } from '@/api';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+import { format } from 'date-fns';
 
-export function ProjectList({ filters, onFilterChange }) {
+export default function ProjectList() {
   const [projects, setProjects] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    search: '',
+    status: 'all',
+    sortBy: 'startDate'
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -33,206 +34,165 @@ export function ProjectList({ filters, onFilterChange }) {
 
   const fetchProjects = async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      const queryParams = new URLSearchParams();
-      if (filters.search) queryParams.append('search', filters.search);
-      if (filters.status !== 'all') queryParams.append('status', filters.status);
-      if (filters.phase !== 'all') queryParams.append('phase', filters.phase);
-      if (filters.priority !== 'all') queryParams.append('priority', filters.priority);
-      queryParams.append('page', filters.page);
-      queryParams.append('limit', filters.limit);
-      queryParams.append('sort', filters.sort);
-
-      const response = await api.admin.getAllProjects({ params: queryParams });
-      
-      if (response?.data?.data) {
-        setProjects(response.data.data.projects);
-        setTotalPages(response.data.data.totalPages);
-      } else {
-        throw new Error('Invalid response format');
+      setLoading(true);
+      const response = await projectsApi.getAllProjects(filters);
+      if (response.data) {
+        setProjects(response.data);
       }
-    } catch (err) {
-      console.error('Error fetching projects:', err);
-      setError(err.message || 'Failed to fetch projects');
+    } catch (error) {
+      console.error('Error fetching projects:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch projects. Please try again.',
+        description: 'Failed to fetch projects. Please try again later.',
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'active': return 'bg-blue-100 text-blue-800';
-      case 'on-hold': return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'planning': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+    const colors = {
+      active: 'bg-green-500',
+      completed: 'bg-blue-500',
+      on_hold: 'bg-yellow-500',
+      cancelled: 'bg-red-500'
+    };
+    return colors[status] || 'bg-gray-500';
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'medium': return 'bg-blue-100 text-blue-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const calculateDaysRemaining = (endDate) => {
-    const end = new Date(endDate);
-    const today = new Date();
-    const diff = end - today;
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-48 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-destructive">{error}</p>
-        <Button onClick={fetchProjects} className="mt-4">Retry</Button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Projects</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-24 bg-gray-200 rounded animate-pulse" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {projects.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          No projects found
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-4">
-            {projects.map(project => (
-              <Link key={project._id} href={`/projects/${project._id}`}>
-                <Card className="hover:bg-accent/5 transition-colors">
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col md:flex-row gap-6">
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-lg">{project.name}</h3>
-                          <Badge className={getStatusColor(project.status)}>
-                            {project.status}
-                          </Badge>
-                          <Badge className={getPriorityColor(project.priority)}>
-                            {project.priority}
-                          </Badge>
-                        </div>
-
-                        <p className="text-muted-foreground line-clamp-2">
-                          {project.description}
-                        </p>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <div className="text-sm">
-                              {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <div className="text-sm">
-                              {project.members?.length || 0} members
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <div className="text-sm">
-                              {calculateDaysRemaining(project.endDate)} days remaining
-                            </div>
-                          </div>
-
-                          {project.isDelayed && (
-                            <div className="flex items-center gap-2 text-destructive">
-                              <AlertCircle className="h-4 w-4" />
-                              <div className="text-sm">Delayed</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="w-full md:w-64 space-y-4">
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>Progress</span>
-                            <span>{project.progress}%</span>
-                          </div>
-                          <Progress value={project.progress} className="h-2" />
-                        </div>
-
-                        <div className="flex -space-x-2">
-                          {project.members?.slice(0, 5).map((member, index) => (
-                            <Avatar key={member._id} className="border-2 border-background">
-                              <AvatarImage src={member.photo} />
-                              <AvatarFallback>{member.name?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                          ))}
-                          {project.members?.length > 5 && (
-                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-sm">
-                              +{project.members.length - 5}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <ChevronRight className="hidden md:block h-6 w-6 text-muted-foreground self-center" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Projects</CardTitle>
+        <Link href="/projects/create">
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            New Project
+          </Button>
+        </Link>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search projects..."
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <Select
+              value={filters.status}
+              onValueChange={(value) => handleFilterChange('status', value)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.sortBy}
+              onValueChange={(value) => handleFilterChange('sortBy', value)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="startDate">Start Date</SelectItem>
+                <SelectItem value="endDate">End Date</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => onFilterChange('page', Math.max(1, filters.page - 1))}
-                  disabled={filters.page === 1}
-                />
-              </PaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <PaginationItem key={i + 1}>
-                  <PaginationLink
-                    onClick={() => onFilterChange('page', i + 1)}
-                    isActive={filters.page === i + 1}
-                  >
-                    {i + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => onFilterChange('page', Math.min(totalPages, filters.page + 1))}
-                  disabled={filters.page === totalPages}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </>
-      )}
-    </div>
+          <div className="grid gap-4">
+            {projects.map((project) => (
+              <Link
+                key={project._id}
+                href={`/projects/${project._id}`}
+                className="block"
+              >
+                <div className="border rounded-lg p-4 hover:border-primary transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-medium">{project.name}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {project.description}
+                      </p>
+                    </div>
+                    <Badge className={getStatusColor(project.status)}>
+                      {project.status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center gap-6 mt-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        {format(new Date(project.startDate), 'MMM d, yyyy')} - {format(new Date(project.endDate), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      <span>{project.teamMembers?.length || 0} members</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-4">
+                    {project.tags?.map((tag) => (
+                      <Badge key={tag} variant="outline">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </Link>
+            ))}
+
+            {projects.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No projects found.
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

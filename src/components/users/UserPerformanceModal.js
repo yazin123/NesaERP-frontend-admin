@@ -8,10 +8,11 @@ import {
   Award,
   Star
 } from 'lucide-react';
-import api from '@/api';
-import toast from 'react-hot-toast';
+import { usersApi, monitoringApi } from '@/api';
+import { useToast } from '@/hooks/use-toast';
 
 const UserPerformanceModal = ({ isOpen, onClose, userId }) => {
+  const { toast } = useToast();
   const [performances, setPerformances] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -40,33 +41,43 @@ const UserPerformanceModal = ({ isOpen, onClose, userId }) => {
 
   const fetchUserData = async () => {
     try {
-      const response = await api.get(`/users/${userId}`);
-      setUserData(response.data.user);
+      const response = await usersApi.getUserById(userId);
+      setUserData(response.data);
     } catch (error) {
-      toast.error('Failed to fetch user data');
-      console.log('Error fetching user data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch user data',
+        variant: 'destructive',
+      });
+      console.error('Error fetching user data:', error);
     }
   };
 
   const fetchPerformanceData = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/performance/performance-summary`, {
-        params: {
-          userId: userId,
-          month: filters.month,
-          year: filters.year
-        }
+      const response = await monitoringApi.getPerformanceSummary({
+        userId: userId,
+        month: filters.month,
+        year: filters.year
       });
       if (response.data.success) {
         setPerformances(response.data.data);
         setStats(response.data.stats);
       } else {
-        toast.error('Failed to fetch performance data');
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch performance data',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
-      toast.error('Error loading performance data');
-      console.log('Failed to fetch performance data:', error);
+      toast({
+        title: 'Error',
+        description: 'Error loading performance data',
+        variant: 'destructive',
+      });
+      console.error('Failed to fetch performance data:', error);
       setPerformances([]);
       setStats(null);
     } finally {

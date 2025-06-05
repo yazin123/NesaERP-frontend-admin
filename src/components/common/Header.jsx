@@ -1,4 +1,6 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import {
     Bell,
     Search,
@@ -6,7 +8,9 @@ import {
     User,
     LogOut,
     Menu,
-    X
+    X,
+    Moon,
+    Sun
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
@@ -28,14 +32,16 @@ import { useRouter, usePathname } from 'next/navigation';
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from "@/components/ui/badge";
-import api from '@/api';
+import { useTheme } from 'next-themes';
+import { NotificationService } from '@/services/notification';
 
-const Header = ({ toggleSidebar, isSidebarOpen }) => {
+const Header = ({ toggleSidebar, isSidebarOpen, children }) => {
     const router = useRouter();
     const pathname = usePathname();
     const { user, logout } = useAuth();
-    const [notifications, setNotifications] = React.useState([]);
+    const [notifications, setNotifications] = useState([]);
     const [showSearch, setShowSearch] = React.useState(false);
+    const { setTheme, theme } = useTheme();
 
     // Get page title from current route
     const getPageTitle = () => {
@@ -49,10 +55,9 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     const handleLogout = async () => {
         try {
             await logout();
+            router.push('/');
         } catch (error) {
-            console.error('Logout error:', error);
-            // Still logout the user locally even if the API call fails
-            logout();
+            console.error('Logout failed:', error);
         }
     };
 
@@ -60,7 +65,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     React.useEffect(() => {
         const fetchNotifications = async () => {
             try {
-                const response = await api.getMyNotifications();
+                const response = await NotificationService.getNotifications();
                 setNotifications(response.data.notifications?.filter(n => !n.read) || []);
             } catch (error) {
                 console.error('Failed to fetch notifications:', error);
@@ -68,6 +73,11 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         };
         fetchNotifications();
     }, []);
+
+    const getInitials = (name) => {
+        if (!name) return 'U';
+        return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    };
 
     return (
         <motion.header
@@ -123,7 +133,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                                 {notifications.length > 0 && (
                                     <Badge 
                                         variant="destructive" 
-                                        className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center"
                                     >
                                         {notifications.length}
                                     </Badge>
@@ -140,10 +150,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                             ) : (
                                 notifications.map((notification) => (
                                     <DropdownMenuItem key={notification.id}>
-                                        <div className="flex flex-col gap-1">
-                                            <p className="text-sm font-medium">{notification.title}</p>
-                                            <p className="text-xs text-muted-foreground">{notification.message}</p>
-                                        </div>
+                                        {notification.message}
                                     </DropdownMenuItem>
                                 ))
                             )}
@@ -154,8 +161,8 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                                 <Avatar className="h-8 w-8">
-                                    <AvatarImage src={user?.avatar} />
-                                    <AvatarFallback>{user?.name?.charAt(0) || 'U'}</AvatarFallback>
+                                    <AvatarImage src={user?.avatar} alt={user?.name} />
+                                    <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
                                 </Avatar>
                             </Button>
                         </DropdownMenuTrigger>
@@ -164,23 +171,23 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                                 <div className="flex flex-col space-y-1">
                                     <p className="text-sm font-medium leading-none">{user?.name}</p>
                                     <p className="text-xs leading-none text-muted-foreground">
-                                        {user?.department}
+                                        {user?.email}
                                     </p>
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => router.push('/profile')}>
                                 <User className="mr-2 h-4 w-4" />
-                                <span>Profile</span>
+                                Profile
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => router.push('/settings')}>
                                 <Settings className="mr-2 h-4 w-4" />
-                                <span>Settings</span>
+                                Settings
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={handleLogout}>
                                 <LogOut className="mr-2 h-4 w-4" />
-                                <span>Log out</span>
+                                Log out
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>

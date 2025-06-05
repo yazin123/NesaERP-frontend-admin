@@ -19,7 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
@@ -33,12 +33,11 @@ import {
     CommandInput,
     CommandItem,
 } from "@/components/ui/command";
-import api from '@/api';
+import { usersApi, organizationApi } from '@/api';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from "@/lib/utils";
 
-
-const EmployeeForm = ({ employee = null }) => {
+const EmployeeForm = ({ employee = null, onSuccess }) => {
     const router = useRouter();
     const isEdit = !!employee;
     const { toast } = useToast();
@@ -62,7 +61,22 @@ const EmployeeForm = ({ employee = null }) => {
             skills: employee?.skills || [],
             status: employee?.status || 'active',
             allowedWifiNetworks: employee?.allowedWifiNetworks || [{ ssid: '', macAddress: '' }],
-            reportingTo: employee?.reportingTo?._id || ''
+            reportingTo: employee?.reportingTo?._id || '',
+            firstName: employee?.firstName || '',
+            lastName: employee?.lastName || '',
+            joinDate: employee?.joinDate ? employee.joinDate.split('T')[0] : '',
+            address: employee?.address || '',
+            photo: null,
+            resume: null,
+            bankDetails: {
+                accountName: employee?.bankDetails?.accountName || '',
+                branch: employee?.bankDetails?.branch || '',
+            },
+            emergencyContact: {
+                name: employee?.emergencyContact?.name || '',
+                relationship: employee?.emergencyContact?.relationship || '',
+                phone: employee?.emergencyContact?.phone || ''
+            }
         }
     });
 
@@ -73,6 +87,8 @@ const EmployeeForm = ({ employee = null }) => {
     const [managers, setManagers] = useState([]);
     const [skillInput, setSkillInput] = useState('');
     const [openSkillsCommand, setOpenSkillsCommand] = useState(false);
+    const [departments, setDepartments] = useState([]);
+    const [designations, setDesignations] = useState([]);
 
     // Updated options with proper values from the model
     const roleOptions = [
@@ -121,11 +137,12 @@ const EmployeeForm = ({ employee = null }) => {
 
     useEffect(() => {
         fetchManagers();
+        fetchDepartmentsAndDesignations();
     }, []);
 
     const fetchManagers = async () => {
         try {
-            const response = await api.admin.getEmployees();
+            const response = await usersApi.getEmployees();
             if (response?.data) {
                 setManagers(response.data.users || []);
             } else {
@@ -140,6 +157,30 @@ const EmployeeForm = ({ employee = null }) => {
             });
         } finally {
             setFormLoading(false);
+        }
+    };
+
+    const fetchDepartmentsAndDesignations = async () => {
+        try {
+            const [departmentsRes, designationsRes] = await Promise.all([
+                organizationApi.getAllDepartments(),
+                organizationApi.getAllDesignations()
+            ]);
+
+            if (departmentsRes.data) {
+                setDepartments(departmentsRes.data);
+            }
+
+            if (designationsRes.data) {
+                setDesignations(designationsRes.data);
+            }
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to fetch required data. Please try again later.',
+                variant: 'destructive',
+            });
         }
     };
 
@@ -208,14 +249,15 @@ const EmployeeForm = ({ employee = null }) => {
 
             // Make API call
             const response = isEdit
-                ? await api.admin.updateUser(employee._id, data)
-                : await api.admin.createUser(data);
+                ? await usersApi.updateEmployee(employee._id, data)
+                : await usersApi.createEmployee(data);
 
             if (response.data.success) {
                 toast({
                     title: 'Success',
                     description: `Employee ${isEdit ? 'updated' : 'created'} successfully`,
                 });
+                if (onSuccess) onSuccess(response.data);
                 router.push('/employees');
             } else {
                 throw new Error('Failed to save employee');
@@ -232,6 +274,10 @@ const EmployeeForm = ({ employee = null }) => {
             setLoading(false);
         }
     };
+
+    const filteredDesignations = formData.department
+        ? designations.filter(d => d.department._id === formData.department)
+        : [];
 
     if (formLoading) {
         return (
@@ -311,9 +357,12 @@ const EmployeeForm = ({ employee = null }) => {
                 )}
 
                 <Card>
-                    <CardContent className="p-6">
+                    <CardHeader>
+                        <CardTitle>{isEdit ? 'Edit Employee' : 'Create Employee'}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Display Employee ID if editing */}
                                 {isEdit && (
                                     <div className="col-span-2">
@@ -409,12 +458,12 @@ const EmployeeForm = ({ employee = null }) => {
                                                     <SelectValue placeholder="Select designation" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {designationOptions.map(option => (
+                                                    {filteredDesignations.map(option => (
                                                         <SelectItem
-                                                            key={option.value}
-                                                            value={option.value}
+                                                            key={option._id}
+                                                            value={option._id}
                                                         >
-                                                            {option.label}
+                                                            {option.name}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -442,12 +491,12 @@ const EmployeeForm = ({ employee = null }) => {
                                                     <SelectValue placeholder="Select department" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {departmentOptions.map(option => (
+                                                    {departments.map(option => (
                                                         <SelectItem
-                                                            key={option.value}
-                                                            value={option.value}
+                                                            key={option._id}
+                                                            value={option._id}
                                                         >
-                                                            {option.label}
+                                                            {option.name}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -836,6 +885,170 @@ const EmployeeForm = ({ employee = null }) => {
                                                 )}
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">First Name</label>
+                                <Controller
+                                    name="firstName"
+                                    control={control}
+                                    rules={{ required: 'First name is required' }}
+                                    render={({ field }) => (
+                                        <Input
+                                            {...field}
+                                            placeholder="Enter first name"
+                                            className={errors.firstName ? 'border-red-500' : ''}
+                                        />
+                                    )}
+                                />
+                                {errors.firstName && (
+                                    <p className="text-sm text-red-500">{errors.firstName.message}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Last Name</label>
+                                <Controller
+                                    name="lastName"
+                                    control={control}
+                                    rules={{ required: 'Last name is required' }}
+                                    render={({ field }) => (
+                                        <Input
+                                            {...field}
+                                            placeholder="Enter last name"
+                                            className={errors.lastName ? 'border-red-500' : ''}
+                                        />
+                                    )}
+                                />
+                                {errors.lastName && (
+                                    <p className="text-sm text-red-500">{errors.lastName.message}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Join Date</label>
+                                <Controller
+                                    name="joinDate"
+                                    control={control}
+                                    rules={{ required: 'Join date is required' }}
+                                    render={({ field }) => (
+                                        <Input
+                                            {...field}
+                                            type="date"
+                                            className={errors.joinDate ? 'border-red-500' : ''}
+                                        />
+                                    )}
+                                />
+                                {errors.joinDate && (
+                                    <p className="text-sm text-red-500">{errors.joinDate.message}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Address</label>
+                                <Controller
+                                    name="address"
+                                    control={control}
+                                    rules={{ required: 'Address is required' }}
+                                    render={({ field }) => (
+                                        <Textarea
+                                            {...field}
+                                            placeholder="Enter address"
+                                            className={errors.address ? 'border-red-500' : ''}
+                                            rows={3}
+                                        />
+                                    )}
+                                />
+                                {errors.address && (
+                                    <p className="text-sm text-red-500">{errors.address.message}</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">Bank Details</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Account Name</label>
+                                        <Controller
+                                            name="bankDetails.accountName"
+                                            control={control}
+                                            rules={{ required: 'Account name is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="Enter account name"
+                                                    error={errors.bankDetails?.accountName?.message}
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Branch</label>
+                                        <Controller
+                                            name="bankDetails.branch"
+                                            control={control}
+                                            rules={{ required: 'Branch is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="Enter branch"
+                                                    error={errors.bankDetails?.branch?.message}
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">Emergency Contact</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Name</label>
+                                        <Controller
+                                            name="emergencyContact.name"
+                                            control={control}
+                                            rules={{ required: 'Emergency contact name is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="Enter emergency contact name"
+                                                    error={errors.emergencyContact?.name?.message}
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Relationship</label>
+                                        <Controller
+                                            name="emergencyContact.relationship"
+                                            control={control}
+                                            rules={{ required: 'Emergency contact relationship is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="Enter emergency contact relationship"
+                                                    error={errors.emergencyContact?.relationship?.message}
+                                                />
+                                            )}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Phone</label>
+                                        <Controller
+                                            name="emergencyContact.phone"
+                                            control={control}
+                                            rules={{ required: 'Emergency contact phone is required' }}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="Enter emergency contact phone"
+                                                    error={errors.emergencyContact?.phone?.message}
+                                                />
+                                            )}
+                                        />
                                     </div>
                                 </div>
                             </div>

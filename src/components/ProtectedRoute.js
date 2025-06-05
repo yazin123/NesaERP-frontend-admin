@@ -10,18 +10,11 @@ export default function ProtectedRoute({ children }) {
 
   useEffect(() => {
     if (!loading) {
-      const token = localStorage.getItem('authToken');
-      if (!token || !isAuthenticated) {
-        // Clear any stale data
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+      if (!isAuthenticated) {
         router.replace('/');
-      } else if (user?.role && !['superadmin', 'admin'].includes(user.role)) {
-        // If user is not admin/superadmin, redirect to employee dashboard
-        router.replace('/employee/dashboard');
       }
     }
-  }, [loading, isAuthenticated, router, user]);
+  }, [loading, isAuthenticated, router]);
 
   if (loading) {
     return (

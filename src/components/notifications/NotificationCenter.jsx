@@ -21,7 +21,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { NotificationService } from '@/services/notification';
+import { notificationsApi } from '@/api';
 
 export function NotificationCenter() {
     const [notifications, setNotifications] = useState([]);
@@ -44,12 +44,17 @@ export function NotificationCenter() {
 
     const fetchNotifications = async () => {
         try {
-            const response = await NotificationService.getNotifications();
-            setNotifications(response.data);
+            const response = await notificationsApi.getNotifications();
+            if (response.data && response.data.notifications) {
+                setNotifications(response.data.notifications);
+            } else {
+                throw new Error('Invalid response format');
+            }
         } catch (error) {
+            console.error('Failed to fetch notifications:', error);
             toast({
                 title: 'Error',
-                description: 'Failed to fetch notifications',
+                description: 'Failed to fetch notifications. Please try again later.',
                 variant: 'destructive',
             });
         } finally {
@@ -59,7 +64,7 @@ export function NotificationCenter() {
 
     const fetchPreferences = async () => {
         try {
-            const response = await NotificationService.getNotificationPreferences();
+            const response = await notificationsApi.getNotificationPreferences();
             setPreferences(response.data);
         } catch (error) {
             console.error('Failed to fetch preferences:', error);
@@ -68,7 +73,7 @@ export function NotificationCenter() {
 
     const markAsRead = async (notificationId) => {
         try {
-            await NotificationService.markAsRead(notificationId);
+            await notificationsApi.markAsRead(notificationId);
             setNotifications(notifications.map(n => 
                 n.id === notificationId ? { ...n, read: true } : n
             ));
@@ -83,7 +88,7 @@ export function NotificationCenter() {
 
     const markAllAsRead = async () => {
         try {
-            await NotificationService.markAllAsRead();
+            await notificationsApi.markAllAsRead();
             setNotifications(notifications.map(n => ({ ...n, read: true })));
             toast({
                 title: 'Success',
@@ -100,7 +105,7 @@ export function NotificationCenter() {
 
     const deleteNotification = async (notificationId) => {
         try {
-            await NotificationService.deleteNotification(notificationId);
+            await notificationsApi.deleteNotification(notificationId);
             setNotifications(notifications.filter(n => n.id !== notificationId));
             toast({
                 title: 'Success',
@@ -118,7 +123,7 @@ export function NotificationCenter() {
     const updatePreferences = async (key, value) => {
         try {
             const newPreferences = { ...preferences, [key]: value };
-            await NotificationService.updateNotificationPreferences(newPreferences);
+            await notificationsApi.updateNotificationPreferences(newPreferences);
             setPreferences(newPreferences);
             toast({
                 title: 'Success',

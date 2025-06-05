@@ -61,7 +61,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import api from '@/api';
+import { usersApi, organizationApi } from '@/api';
 import { useToast } from '@/hooks/use-toast';
 
 const EmployeeList = () => {
@@ -69,6 +69,7 @@ const EmployeeList = () => {
     const { user } = useAuth();
     const toast = useToast();
     const [employees, setEmployees] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [totalCount, setTotalCount] = useState(0);
     const [filters, setFilters] = useState({
@@ -118,25 +119,30 @@ const EmployeeList = () => {
     ];
 
     useEffect(() => {
-        fetchEmployees();
+        fetchData();
     }, [filters]);
 
-    const fetchEmployees = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-            console.log("filters", filters);
-            const response = await api.admin.getEmployees(filters);
-            if (response) {
-                console.log("response", response.data);
-                setEmployees(response.data.users || []);
-                setTotalCount(response?.data.total || 0);
+            const [employeesRes, departmentsRes] = await Promise.all([
+                usersApi.getEmployees(filters),
+                organizationApi.getAllDepartments()
+            ]);
+
+            if (employeesRes.data) {
+                setEmployees(employeesRes.data);
+            }
+
+            if (departmentsRes.data) {
+                setDepartments(departmentsRes.data);
             }
         } catch (error) {
-            console.error('Error fetching employees:', error);
+            console.error('Error fetching data:', error);
             toast({
-                title: "Error",
-                description: "Failed to fetch employees. Please try again.",
-                variant: "destructive"
+                title: 'Error',
+                description: 'Failed to fetch employees. Please try again later.',
+                variant: 'destructive',
             });
         } finally {
             setLoading(false);
@@ -152,13 +158,13 @@ const EmployeeList = () => {
     const handleDeleteEmployee = async (id) => {
         if (window.confirm('Are you sure you want to delete this employee?')) {
             try {
-                await api.admin.deleteEmployee(id);
-                await fetchEmployees();
+                await usersApi.deleteEmployee(id);
                 toast({
                     title: "Success",
                     description: "Employee deleted successfully",
                     variant: "default"
                 });
+                fetchData();
             } catch (error) {
                 console.error('Error deleting employee:', error);
                 toast({
@@ -175,6 +181,16 @@ const EmployeeList = () => {
     };
 
     const totalPages = Math.ceil(totalCount / filters.limit);
+
+    const getStatusColor = (status) => {
+        const colors = {
+            active: 'bg-green-500',
+            inactive: 'bg-gray-500',
+            on_leave: 'bg-yellow-500',
+            terminated: 'bg-red-500'
+        };
+        return colors[status] || 'bg-gray-500';
+    };
 
     return (
         <div className="p-6 space-y-6">
@@ -242,9 +258,9 @@ const EmployeeList = () => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Departments</SelectItem>
-                            {departmentOptions.map(option => (
-                                <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
+                            {departments.map((dept) => (
+                                <SelectItem key={dept._id} value={dept._id}>
+                                    {dept.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -353,11 +369,11 @@ const EmployeeList = () => {
                                     <TableCell>
                                         <Badge variant="outline">
                                             <Building className="mr-1 h-3 w-3" />
-                                            {employee.department}
+                                            {employee.department?.name}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge>{employee.designation}</Badge>
+                                        <Badge>{employee.designation?.name}</Badge>
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant="secondary">{employee.position}</Badge>
@@ -431,12 +447,14 @@ const EmployeeList = () => {
                                     </div>
                                     <div className="flex items-center gap-2 text-sm">
                                         <Building className="h-4 w-4 text-muted-foreground" />
-                                        <span>{employee.department}</span>
+                                        <span>{employee.department?.name}</span>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    <Badge>{employee.designation}</Badge>
-                                    <Badge variant="secondary">{employee.position}</Badge>
+                                    <Badge>{employee.designation?.name}</Badge>
+                                    <Badge className={getStatusColor(employee.status)}>
+                                        {employee.status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                    </Badge>
                                 </div>
                                 <div className="flex justify-end gap-2">
                                     <Button variant="ghost" size="sm" asChild>

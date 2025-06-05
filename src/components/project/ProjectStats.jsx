@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, Clock, CheckCircle2, AlertCircle, Users, Calendar } from 'lucide-react';
-import api from '@/api';
+import { projectsApi } from '@/api';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -31,7 +31,7 @@ export function ProjectStats() {
   const fetchProjectStats = async () => {
     try {
       setLoading(true);
-      const response = await api.admin.getProjectStats();
+      const response = await projectsApi.getProjectStats();
       if (response?.data?.success && response?.data?.stats) {
         setStats(response.data.stats);
       } else {
